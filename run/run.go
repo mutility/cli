@@ -46,12 +46,12 @@ func (a *Application) Ferror(w io.Writer, err error) {
 func (a *Application) Main(ctx context.Context, env Environ) error {
 	cmd, err := a.Parse(env)
 	switch err := err.(type) {
+	case nil:
 	case extraArgsError:
-		err.cmd.PrintHelp(ctx, env, a)
+		return errors.Join(err, err.cmd.PrintHelp(ctx, env, a))
 	case missingArgsError:
-		err.cmd.PrintHelp(ctx, env, a)
-	}
-	if err != nil {
+		return errors.Join(err, err.cmd.PrintHelp(ctx, env, a))
+	default:
 		return err
 	}
 

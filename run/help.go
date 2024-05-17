@@ -16,8 +16,7 @@ func helpCommand(a *Application, cmd *Command) *Command {
 
 // PrintHelp writes usage information for this command to env.Stdout.
 func (c *Command) PrintHelp(ctx context.Context, env Environ, a *Application) error {
-	writeUsage(env.Stdout, a, c)
-	return nil
+	return writeUsage(env.Stdout, a, c)
 }
 
 func writeUsage(w io.Writer, app *Application, cmd *Command) error {
