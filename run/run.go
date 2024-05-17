@@ -65,6 +65,20 @@ func (a *Application) Main(ctx context.Context, env Environ) error {
 
 // Parse attemps to parse arguments and returns the selected command.
 func (a *Application) Parse(env Environ) (*Command, error) {
+	// options should implement one or more of the following to indicate what they accept.
+	//   - flagParser is invoked for --name: parseFlag(); it accepts no arguments, and should not also implement valueParser
+	//   - inlineParser is invoked for --name=val: parseInline("val")
+	//   - valueParser is invoked for --name val: parseValue("val"), or positional ... val => parseValue("val")
+	//   - valuesParser is invoked for positional ... a b c => parseValue(["a", "b", "c"]), and returns the count it parsed.
+	//
+	// Common combos include inlineParser+valueParser, valuesParser with or without valueParser, and flagParser with or without inlineParser.
+	type (
+		flagParser   interface{ parseFlag() error }
+		inlineParser interface{ parseInline(string) error }
+		valueParser  interface{ parseValue(string) error }
+		valuesParser interface{ parseValues([]string) (int, error) }
+	)
+
 	if len(env.Args) < 1 {
 		return nil, wrap(ErrMissing, "program name")
 	}
@@ -93,15 +107,35 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 
 			if idx, rem := cur.lookupFlag(arg); idx >= 0 && canFlag {
 				opt := &cur.flags[idx]
-				args := flagArgs{env.Args, &i, rem, rem > 0}
-				if rem == 0 {
-					i++
-				}
-				if err := opt.option.(optionFlagArg).parseArg(&args); err != nil {
-					return nil, flagParseError{cur, opt, arg, err}
-				}
-				if args.needConsume {
-					return nil, flagArgUnconsumedError{cur, arg, rem}
+				switch rem {
+				case 0: // --arg possibly with following val
+					switch parse := opt.option.(type) {
+					case flagParser: // --arg <ignored>
+						if err := parse.parseFlag(); err != nil {
+							return nil, flagParseError{cur, opt, arg, err}
+						}
+						i += 1
+					case valueParser: // --arg val
+						if i+1 >= len(env.Args) {
+							return nil, missingFlagValueError{cur, opt, arg}
+						}
+						if err := parse.parseValue(env.Args[i+1]); err != nil {
+							return nil, flagParseError{cur, opt, arg, err}
+						}
+						i += 2
+					default:
+						return nil, badFlagError{cur, opt, arg}
+					}
+				default: // --arg=val; rem points to v
+					switch parse := opt.option.(type) {
+					case inlineParser:
+						if err := parse.parseInline(arg[rem:]); err != nil {
+							return nil, flagParseError{cur, opt, arg, err}
+						}
+						i += 1
+					default:
+						return nil, flagArgUnconsumedError{cur, arg, rem}
+					}
 				}
 				opt.valueSet = true
 				continue
@@ -120,16 +154,48 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 
 		if carg < len(cur.args) {
 			opt := &cur.args[carg]
-			args := argArgs{opt, env.Args, &i, true, &canFlag, maybeFlag}
-			if m, ok := opt.option.(optionSlice); ok {
-				if err := m.parseMany(&args); err != nil {
+			switch parser := opt.option.(type) {
+			case valuesParser:
+				args := env.Args[i:]
+				if !canFlag {
+					took, err := parser.parseValues(args)
+					if err != nil {
+						return nil, argParseError{cur, opt, args[took], err}
+					}
+					i += took
+				} else {
+					uncan := len(args) // track end of canFlag, to handle where processing ends
+					for i, arg := range args {
+						if arg == "--" {
+							uncan = i
+							immutArgs := args
+							args = make([]string, len(args)-1)
+							copy(args[:i], immutArgs[:i])
+							copy(args[i:], immutArgs[i+1:])
+							break
+						} else if !opt.can(arg) {
+							args = args[:i]
+							break
+						}
+					}
+					took, err := parser.parseValues(args)
+					if err != nil {
+						return nil, argParseError{cur, opt, args[took], err}
+					}
+					i += took
+					if took > uncan {
+						i++
+						canFlag = false
+					}
+				}
+
+			case valueParser:
+				if err := parser.parseValue(arg); err != nil {
 					return nil, argParseError{cur, opt, arg, err}
 				}
-			} else if err := opt.option.(optionFlagArg).parseArg(&args); err != nil {
-				return nil, argParseError{cur, opt, arg, err}
-			}
-			if args.needConsume {
-				return nil, argUnconsumedError{cur, arg}
+				i += 1
+			default:
+				return nil, badArgError{cur, opt, arg}
 			}
 			carg++
 			continue
@@ -171,78 +237,6 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 	}
 
 	return cur, nil
-}
-
-type flagArgs struct {
-	args        []string
-	pi          *int // increment to consume additional args
-	rem         int  // if nonzero, first arg contains a value starting index rem
-	needConsume bool // tracks whether embedded value was consumed
-}
-
-func (a *flagArgs) Peek() (string, bool) {
-	if *a.pi >= len(a.args) || (a.rem > 0 && !a.needConsume) {
-		return "", false
-	}
-	if a.needConsume {
-		return a.args[*a.pi][a.rem:], true
-	} else {
-		return a.args[*a.pi], true
-	}
-}
-
-func (a *flagArgs) Next() (string, bool) {
-	v, ok := a.Peek()
-	if ok {
-		*a.pi++
-		a.needConsume = false
-	}
-	return v, ok
-}
-
-type argArgs struct {
-	arg         *Arg
-	args        []string
-	pi          *int  // increment to consume additional args
-	needConsume bool  // tracks whether one or more args were consumed
-	pcanFlag    *bool // tracks whether we've seen --
-	maybeFlag   func(string) bool
-}
-
-func (a *argArgs) Peek() (string, bool) {
-	if *a.pi >= len(a.args) {
-		return "", false
-	}
-	return a.args[*a.pi], true
-}
-
-func (a *argArgs) PeekMany() (string, bool) {
-	if *a.pi >= len(a.args) {
-		return "", false
-	}
-	arg := a.args[*a.pi]
-	if *a.pcanFlag {
-		if arg == "--" {
-			*a.pcanFlag = false
-			*a.pi++ // peek normally doesn't advance, but will skip --
-			return a.PeekMany()
-		}
-
-		if a.maybeFlag(arg) && !a.arg.can(arg) {
-			return "", false
-		}
-	}
-
-	return a.args[*a.pi], true
-}
-
-func (a *argArgs) Next() (string, bool) {
-	v, ok := a.Peek()
-	if ok {
-		*a.pi++
-		a.needConsume = false
-	}
-	return v, ok
 }
 
 func wrap(e error, m string) error {

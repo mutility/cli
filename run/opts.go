@@ -1,30 +1,38 @@
 package run
 
 import (
-	"errors"
-	"fmt"
 	"slices"
-	"strconv"
-	"unsafe"
 )
 
 type options[T any] struct {
 	name     string
 	desc     string
 	value    *[]T
-	parse    func(string) error
+	parse    func(string) (T, error)
 	prefixOK string   // set to - to allow -[^-]+, or -- to allow --.+ in arg context
 	strOK    []string // include unusual values such as - to allow them in arg context
 	see      []*Command
 }
 
-func (o *options[T]) description() string            { return o.desc }
-func (o *options[T]) seeAlso() []*Command            { return o.see }
-func (o *options[T]) setSeeAlso(cmds ...*Command)    { o.see = cmds }
-func (o *options[T]) parseDefault(arg string) error  { return o.parse(arg) }
-func (o *options[T]) parseMany(args argSource) error { return manyParser(o.parse)(args) }
-func (o *options[T]) okValues() []string             { return o.strOK }
-func (o *options[T]) okPrefix() string               { return o.prefixOK }
+func (o *options[T]) description() string                    { return o.desc }
+func (o *options[T]) seeAlso() []*Command                    { return o.see }
+func (o *options[T]) setSeeAlso(cmds ...*Command)            { o.see = cmds }
+func (o *options[T]) parseDefault(arg string) error          { _, err := o.got([]string{arg}); return err }
+func (o *options[T]) parseValues(args []string) (int, error) { return o.got(args) }
+func (o *options[T]) okValues() []string                     { return o.strOK }
+func (o *options[T]) okPrefix() string                       { return o.prefixOK }
+
+func (o *options[T]) got(args []string) (int, error) {
+	*o.value = make([]T, 0, len(args))
+	for i, arg := range args {
+		v, err := o.parse(arg)
+		if err != nil {
+			return i, err
+		}
+		*o.value = append(*o.value, v)
+	}
+	return len(args), nil
+}
 
 func (o *options[T]) Value() []T { return *o.value }
 
@@ -43,9 +51,8 @@ func StringSlice(name, desc string) options[string] {
 // This differs from StringLike by supporting Rest().
 func StringLikeSlice[T ~string](name, desc string) options[T] {
 	var v []T
-	parse := func(s string) error {
-		v = append(v, T(s))
-		return nil
+	parse := func(s string) (T, error) {
+		return T(s), nil
 	}
 	return options[T]{
 		name:  name,
@@ -70,21 +77,11 @@ func StringSliceOf[T ~string](name, desc string, names ...T) options[T] {
 func NamedSliceOf[T any](name, desc string, mapping []NamedValue[T]) options[T] {
 	var v []T
 	mapping = slices.Clone(mapping)
-	parse := func(s string) error {
-		pos := slices.IndexFunc(mapping, func(v NamedValue[T]) bool {
-			return v.Name == s
-		})
-		if pos < 0 {
-			return NotOneOfError[T]{s, mapping}
-		}
-		v = append(v, T(mapping[pos].Value))
-		return nil
-	}
 	return options[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
-		parse: parse,
+		parse: (namedValues[T])(mapping).parse,
 	}
 }
 
@@ -116,23 +113,11 @@ func IntSlice(name, desc string, base int) options[int] {
 // This differs from IntLike by supporting Rest().
 func IntLikeSlice[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) options[T] {
 	var v []T
-	var vt T
-	parse := func(s string) error {
-		i, err := strconv.ParseInt(s, base, int(unsafe.Sizeof(vt))*8)
-		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
-			return fmt.Errorf("parsing %q as %T: %v", e.Num, vt, e.Err)
-		}
-		if err != nil {
-			return err
-		}
-		v = append(v, T(i))
-		return nil
-	}
 	return options[T]{
 		name:     name,
 		desc:     desc,
 		value:    &v,
-		parse:    parse,
+		parse:    parseIntLike[T](base),
 		prefixOK: "-",
 	}
 }
@@ -149,23 +134,11 @@ func UintSlice(name, desc string, base int) options[uint] {
 // This differs from UintLike by supporting Rest().
 func UintLikeSlice[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) options[T] {
 	var v []T
-	var vt T
-	parse := func(s string) error {
-		i, err := strconv.ParseUint(s, base, int(unsafe.Sizeof(vt))*8)
-		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
-			return fmt.Errorf("parsing %q as %T: %v", e.Num, vt, e.Err)
-		}
-		if err != nil {
-			return err
-		}
-		v = append(v, T(i))
-		return nil
-	}
 	return options[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
-		parse: parse,
+		parse: parseUintLike[T](base),
 	}
 }
 
@@ -174,37 +147,11 @@ func UintLikeSlice[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc st
 // This differs from FloatLike by supporting Rest().
 func FloatLikeSlice[T ~float32 | ~float64](name, desc string) options[T] {
 	var v []T
-	var vt T
-	parse := func(s string) error {
-		i, err := strconv.ParseFloat(s, int(unsafe.Sizeof(vt))*8)
-		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
-			return fmt.Errorf("parsing %q as %T: %v", e.Num, vt, e.Err)
-		}
-		if err != nil {
-			return err
-		}
-		v = append(v, T(i))
-		return nil
-	}
 	return options[T]{
-		name:  name,
-		desc:  desc,
-		value: &v,
-		parse: parse,
-	}
-}
-
-func manyParser(parse func(string) error) func(argSource) error {
-	return func(s argSource) error {
-		for v, ok := s.PeekMany(); ok; v, ok = s.PeekMany() {
-			if !ok {
-				return missingArgsError{}
-			}
-			if err := parse(v); err != nil {
-				return err
-			}
-			s.Next()
-		}
-		return nil
+		name:     name,
+		desc:     desc,
+		value:    &v,
+		parse:    parseFloatLike[T],
+		prefixOK: "-",
 	}
 }

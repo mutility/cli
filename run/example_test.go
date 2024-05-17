@@ -164,13 +164,13 @@ func ExampleUintSlice_many() {
 	}
 
 	try()
-	try("5")
-	try("6", "-2", "17") // 6 gets saved before -2 fails the parse.
+	try("5", "2")
+	try("6", "-2", "17") // -2 blocks the parse, then has no home
 
 	// output:
 	// runtest: error: expected "<arg> ..."
 	// argVal: []
-	// argVal: [5]
+	// argVal: [5 2]
 	// runtest: error: unexpected flag: -2
 	// argVal: [6]
 }
@@ -329,7 +329,7 @@ func ExampleApplication_Flags() {
 
 	// output:
 	// a:  b: beta
-	// runtest: error: --a: no argument provided
+	// runtest: error: --a: expected <value>
 	// a:  b: gamma
 }
 

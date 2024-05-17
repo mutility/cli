@@ -1,6 +1,7 @@
 package run
 
 import (
+	"cmp"
 	"strconv"
 	"strings"
 )
@@ -29,6 +30,17 @@ func (e NotOneOfError[T]) Error() string {
 	return strconv.Quote(e.name) + " unsupported value"
 }
 
+type missingFlagValueError struct {
+	cmd   *Command
+	flag  *Flag
+	after string
+}
+
+func (e missingFlagValueError) Error() string {
+	hint := cmp.Or(e.flag.hint, "<value>")
+	return withCommand(e.cmd, e.after, "expected "+hint)
+}
+
 type missingCmdError struct {
 	cmd *Command
 }
@@ -44,7 +56,7 @@ type flagArgUnconsumedError struct {
 }
 
 func (e flagArgUnconsumedError) Error() string {
-	return withCommand(e.cmd, "unsued", e.arg[:e.rem-1], strconv.Quote(e.arg[e.rem:]))
+	return withCommand(e.cmd, "unused", e.arg[:e.rem-1], strconv.Quote(e.arg[e.rem:]))
 }
 
 type flagParseError struct {
@@ -56,15 +68,6 @@ type flagParseError struct {
 
 func (e flagParseError) Error() string {
 	return withCommand(e.cmd, e.val, e.err.Error())
-}
-
-type argUnconsumedError struct {
-	cmd *Command
-	arg string
-}
-
-func (e argUnconsumedError) Error() string {
-	return withCommand(e.cmd, "unused", strconv.Quote(e.arg))
 }
 
 type argParseError struct {
@@ -113,6 +116,26 @@ func (e missingArgsError) Error() string {
 		}
 	}
 	return withCommand(e.cmd, "expected "+strconv.Quote(strings.Join(a, " ")))
+}
+
+type badFlagError struct {
+	cmd  *Command
+	flag *Flag
+	at   string
+}
+
+func (e badFlagError) Error() string {
+	return withCommand(e.cmd, "broken flag", e.at)
+}
+
+type badArgError struct {
+	cmd *Command
+	arg *Arg
+	at  string
+}
+
+func (e badArgError) Error() string {
+	return withCommand(e.cmd, "broken argument", e.at)
 }
 
 func withCommand(cmd *Command, s ...string) string {
