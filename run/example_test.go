@@ -373,3 +373,77 @@ func ExampleCmd() {
 	// running foo
 	// running bar
 }
+
+func ExampleEnabler() {
+	try := func(args ...string) {
+		app := run.App("runtest", "testing enable")
+		en := run.Enabler("en", "", false, true)
+		app.Flags(en.Flag())
+		parseMain(app, args...)
+		fmt.Println("enabled:", en.Value())
+	}
+
+	try()
+	try("--en")
+	try("--en", "--en")
+	try("--en=true")
+
+	// output:
+	// enabled: false
+	// enabled: true
+	// runtest: error: --en: repeated
+	// enabled: true
+	// runtest: error: unexpected flag value: --en=true
+	// enabled: false
+}
+
+func ExampleToggler() {
+	try := func(args ...string) {
+		app := run.App("runtest", "testing enable")
+		en := run.Toggler("en", "", false, true)
+		app.Flags(en.Flag())
+		parseMain(app, args...)
+		fmt.Println("enabled:", en.Value())
+	}
+
+	try()
+	try("--en")
+	try("--en", "--en")
+	try("--en", "--en", "--en")
+	try("--en=false")
+
+	// output:
+	// enabled: false
+	// enabled: true
+	// enabled: false
+	// enabled: true
+	// runtest: error: unexpected flag value: --en=false
+	// enabled: false
+}
+
+func ExampleAccumulator() {
+	try := func(args ...string) {
+		app := run.App("runtest", "testing enable")
+		laugh := run.Accumulator[quotedstring]("ha", "", "", "ha")
+		frown := run.Accumulator("no", "", 0, -2)
+		app.Flags(laugh.Flag(), frown.Flag())
+		parseMain(app, args...)
+		fmt.Println("ha:", laugh.Value(), "no:", frown.Value())
+	}
+
+	try()
+	try("--ha")
+	try("--no")
+	try("--ha", "--no", "--ha")
+	try("--ha", "--no", "--ha", "--ha", "--no", "--no", "--no")
+	try("--ha=boop")
+
+	// output:
+	// ha: "" no: 0
+	// ha: "ha" no: 0
+	// ha: "" no: -2
+	// ha: "haha" no: -2
+	// ha: "hahaha" no: -8
+	// runtest: error: unexpected flag value: --ha=boop
+	// ha: "" no: 0
+}

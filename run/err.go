@@ -49,14 +49,13 @@ func (e missingCmdError) Error() string {
 	return withCommand(e.cmd, "expected <command>")
 }
 
-type flagArgUnconsumedError struct {
+type extraFlagValueError struct {
 	cmd *Command
 	arg string
-	rem int
 }
 
-func (e flagArgUnconsumedError) Error() string {
-	return withCommand(e.cmd, "unused", e.arg[:e.rem-1], strconv.Quote(e.arg[e.rem:]))
+func (e extraFlagValueError) Error() string {
+	return withCommand(e.cmd, "unexpected flag value", e.arg)
 }
 
 type flagParseError struct {

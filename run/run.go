@@ -134,7 +134,7 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 						}
 						i += 1
 					default:
-						return nil, flagArgUnconsumedError{cur, arg, rem}
+						return nil, extraFlagValueError{cur, arg}
 					}
 				}
 				opt.valueSet = true
