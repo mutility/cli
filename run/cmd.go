@@ -7,6 +7,16 @@ import (
 	"strings"
 )
 
+// Options implement the required internal interface for use as either Flags, Args, or both.
+type Option interface {
+	description() string
+	seeAlso() []*Command
+	setSeeAlso(cmds ...*Command)
+	parseDefault(string) error
+	okValues() []string
+	okPrefix() string
+}
+
 // Flag represents the named options for a Command.
 type Flag struct {
 	rune          rune

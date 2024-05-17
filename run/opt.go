@@ -8,16 +8,6 @@ import (
 	"unsafe"
 )
 
-// Options implement the required internal interface for use as either Flags, Args, or both.
-type Option interface {
-	description() string
-	seeAlso() []*Command
-	setSeeAlso(cmds ...*Command)
-	parseDefault(string) error
-	okValues() []string
-	okPrefix() string
-}
-
 type option[T any] struct {
 	name     string
 	desc     string
@@ -70,6 +60,10 @@ func (o *option[T]) Pos(name string) Arg {
 func (o *option[T]) Slice() Param[[]T] {
 	return sliceOf[T]{o.value}
 }
+
+type sliceOf[T any] struct{ value *T }
+
+func (s sliceOf[T]) Value() []T { return []T{*s.value} }
 
 // String creates an option that stores any string.
 func String(name, desc string) option[string] {
@@ -193,10 +187,6 @@ func FloatLike[T ~float32 | ~float64](name, desc string) option[T] {
 		parse: parseFloatLike[T],
 	}
 }
-
-type sliceOf[T any] struct{ value *T }
-
-func (s sliceOf[T]) Value() []T { return []T{*s.value} }
 
 func parseIntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](base int) func(string) (T, error) {
 	var vt T
