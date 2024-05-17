@@ -8,6 +8,7 @@ import (
 	"unsafe"
 )
 
+// Options implement the required internal interface for use as either Flags, Args, or both.
 type Option interface {
 	description() string
 	seeAlso() []*Command
@@ -18,11 +19,21 @@ type Option interface {
 }
 
 type optionFlagArg interface {
-	parseArg(FlagArgSource) error
+	parseArg(flagArgSource) error
 }
 
 type optionSlice interface {
-	parseMany(ArgSource) error
+	parseMany(argSource) error
+}
+
+type flagArgSource interface {
+	Peek() (string, bool)
+	Next() (string, bool)
+}
+
+type argSource interface {
+	PeekMany() (string, bool)
+	Next() (string, bool)
 }
 
 type option[T any] struct {
@@ -39,7 +50,7 @@ func (o *option[T]) description() string               { return o.desc }
 func (o *option[T]) seeAlso() []*Command               { return o.see }
 func (o *option[T]) setSeeAlso(cmds ...*Command)       { o.see = cmds }
 func (o *option[T]) parseDefault(arg string) error     { return o.parse(arg) }
-func (o *option[T]) parseArg(args FlagArgSource) error { return argParser(o.parse)(args) }
+func (o *option[T]) parseArg(args flagArgSource) error { return argParser(o.parse)(args) }
 func (o *option[T]) okValues() []string                { return o.strOK }
 func (o *option[T]) okPrefix() string                  { return o.prefixOK }
 
@@ -62,29 +73,18 @@ func (o *option[T]) Pos(name string) Arg {
 	return Arg{option: o, name: name}
 }
 
-// Slice returns a Param that converts a T to a []T
+// Slice returns a Param that converts a T to a []T.
+// This can be used to share a handler between single and slice options.
 func (o *option[T]) Slice() Param[[]T] {
 	return sliceOf[T]{o.value}
 }
 
-func (o *option[T]) SeeAlso(cmd *Command) {
-	o.see = append(o.see, cmd)
-}
-
-type FlagArgSource interface {
-	Peek() (string, bool)
-	Next() (string, bool)
-}
-
-type ArgSource interface {
-	PeekMany() (string, bool)
-	Next() (string, bool)
-}
-
+// String creates an option that stores any string.
 func String(name, desc string) option[string] {
 	return StringLike[string](name, desc)
 }
 
+// String creates an option that stores any string-like value.
 func StringLike[T ~string](name, desc string) option[T] {
 	var v T
 	parse := func(s string) error { v = T(s); return nil }
@@ -102,29 +102,29 @@ type NamedValue[T any] struct {
 	Value T
 }
 
-// OneStringOf defines an option whose value must be one of the provided names.
+// StringOf creates an option that stores a string-like value from the provided list.
 // This is suitable for small to medium sets of string-like names.
-func OneStringOf[T ~string](name, desc string, names ...T) option[T] {
+func StringOf[T ~string](name, desc string, names ...T) option[T] {
 	nvs := make([]NamedValue[T], len(names))
 	for i, nam := range names {
 		nvs[i] = NamedValue[T]{Name: string(nam), Value: nam}
 	}
-	return OneNameOf(name, desc, nvs)
+	return NamedOf(name, desc, nvs)
 }
 
-// OneNameOf defines an option whose value must be one of the provided names.
+// NamedOf creates an option that stores any type of value, looked up from the provided mapping.
 // This is suitable for small to medium sets of names.
-func OneNameOf[T any](name, desc string, names []NamedValue[T]) option[T] {
+func NamedOf[T any](name, desc string, mapping []NamedValue[T]) option[T] {
 	var v T
-	names = slices.Clone(names)
+	mapping = slices.Clone(mapping)
 	parse := func(s string) error {
-		pos := slices.IndexFunc(names, func(v NamedValue[T]) bool {
+		pos := slices.IndexFunc(mapping, func(v NamedValue[T]) bool {
 			return v.Name == s
 		})
 		if pos < 0 {
-			return NotOneOfError[T]{s, names}
+			return NotOneOfError[T]{s, mapping}
 		}
-		v = T(names[pos].Value)
+		v = T(mapping[pos].Value)
 		return nil
 	}
 	return option[T]{
@@ -135,30 +135,34 @@ func OneNameOf[T any](name, desc string, names []NamedValue[T]) option[T] {
 	}
 }
 
+// File creates an option that stores a string filename.
+// This differs from String by accepting "-" as a positional argument.
 func File(name, desc string) option[string] {
 	return FileLike[string](name, desc)
 }
 
+// FileLike creates an option that stores a string-like filename.
+// This differs from StringLike by accepting "-" as a positional argument.
 func FileLike[T ~string](name, desc string) option[T] {
-	var v T
-	parse := func(s string) error { v = T(s); return nil }
-	return option[T]{
-		name:  name,
-		desc:  desc,
-		value: &v,
-		parse: parse,
-		strOK: []string{"-"},
-	}
+	o := StringLike[T](name, desc)
+	o.strOK = dashOK
+	return o
 }
 
-func Int(name, desc string) option[int] {
-	return IntLike[int](name, desc)
+var dashOK = []string{"-"}
+
+// Int creates an option that stores any int.
+// It converts strings like [strconv.ParseInt].
+func Int(name, desc string, base int) option[int] {
+	return IntLike[int](name, desc, base)
 }
 
-func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string) option[T] {
+// IntLike creates an option that stores any int-like value.
+// It converts strings like [strconv.ParseInt].
+func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) option[T] {
 	var v T
 	parse := func(s string) error {
-		i, err := strconv.ParseInt(s, 10, int(unsafe.Sizeof(v))*8)
+		i, err := strconv.ParseInt(s, base, int(unsafe.Sizeof(v))*8)
 		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
 			return fmt.Errorf("parsing %q as %T: %v", e.Num, v, e.Err)
 		}
@@ -177,14 +181,18 @@ func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string) optio
 	}
 }
 
-func Uint(name, desc string) option[uint] {
-	return UintLike[uint](name, desc)
+// Uint creates an option that stores any uint.
+// It converts strings like [strconv.ParseUint].
+func Uint(name, desc string, base int) option[uint] {
+	return UintLike[uint](name, desc, base)
 }
 
-func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string) option[T] {
+// UintLike creates an option that stores any uint-like value.
+// It converts strings like [strconv.ParseUint].
+func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) option[T] {
 	var v T
 	parse := func(s string) error {
-		i, err := strconv.ParseUint(s, 10, int(unsafe.Sizeof(v))*8)
+		i, err := strconv.ParseUint(s, base, int(unsafe.Sizeof(v))*8)
 		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
 			return fmt.Errorf("parsing %q as %T: %v", e.Num, v, e.Err)
 		}
@@ -204,8 +212,8 @@ func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string)
 
 var errMissingArg = errors.New("no argument provided")
 
-func argParser(parse func(string) error) func(FlagArgSource) error {
-	return func(s FlagArgSource) error {
+func argParser(parse func(string) error) func(flagArgSource) error {
+	return func(s flagArgSource) error {
 		v, ok := s.Peek()
 		if !ok {
 			return errMissingArg

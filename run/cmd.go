@@ -3,21 +3,11 @@ package run
 import (
 	"cmp"
 	"context"
-	"errors"
 	"slices"
 	"strings"
 )
 
-type Runner interface {
-	Run(context.Context, *Orders) error
-}
-
-type RunFunc func(context.Context, *Orders) error
-
-func (r RunFunc) Run(ctx context.Context, o *Orders) error { return r(ctx, o) }
-
-type Orders struct{}
-
+// Flag represents the named options for a Command.
 type Flag struct {
 	rune          rune
 	string        string
@@ -44,6 +34,7 @@ type commands []*Command
 
 func (c commands) searchString(index int, s string) int { return cmp.Compare(c[index].name, s) }
 
+// Arg represents a positional option for a Command.
 type Arg struct {
 	option Option
 	name   string
@@ -67,15 +58,20 @@ func (a Arg) describe() string {
 	return desc
 }
 
+// Cmd creates a command.
 func Cmd(name, desc string) *Command {
 	return &Command{name: name, desc: desc}
 }
 
+// Cmd creates a command and applies options.
 func CmdOpt(name, desc string, opts ...CmdOption) (*Command, error) {
 	cmd := Cmd(name, desc)
 	return cmd, applyOpts(cmd, opts)
 }
 
+// A command is a 'verb' for an application.
+// It can be configured with Flags and Args, and a Handler.
+// An application starts with an implicit root command, to which other "sub" commands can be added.
 type Command struct {
 	name, desc, detail string
 
@@ -87,18 +83,14 @@ type Command struct {
 	clookup func(arg string) int              // returns index in cmds of matching *Command (or -1)
 	flookup func(arg string) (index, rem int) // returns index in flags of matching flag (or -1), index in arg after = (or 0)
 
-	handler func(context.Context, Environ) error
-	noHelp  bool
+	handler  func(context.Context, Environ) error
+	noHelp   bool // don't offer -h|--help for this command
+	unlisted bool // don't list this command in its parents help
 }
 
-func (c *Command) Runs(handler func(context.Context, Environ) error) error {
-	if c.handler != nil {
-		return wrap(ErrRedefined, c.name+" handler")
-	}
-	c.handler = handler
-	return nil
-}
-
+// CommandName returns the hierarchical name for a command.
+//
+// For example, if this command represented git commit, it would return "commit".
 func (c *Command) CommandName() string {
 	parts := []string{c.name}
 	for c.parent != nil {
@@ -109,6 +101,9 @@ func (c *Command) CommandName() string {
 	return strings.Join(parts[1:], ".")
 }
 
+// Name returns the hierarchical program name for a command.
+//
+// For example, if this command represented git commit, it would return "git.commit".
 func (c *Command) Name() string {
 	parts := []string{c.name}
 	for c.parent != nil {
@@ -119,6 +114,8 @@ func (c *Command) Name() string {
 	return strings.Join(parts, ".")
 }
 
+// Details sets extra help information for a Command.
+// Attempting to set details more than once causes an error.
 func (c *Command) Details(detail string) error {
 	if c.detail != "" {
 		return wrap(ErrRedefined, c.name+" detail")
@@ -127,6 +124,10 @@ func (c *Command) Details(detail string) error {
 	return nil
 }
 
+// Details sets extra help information for a Command, and links it to options.
+// Options reused in other commands will point to this command for further information.
+//
+// Attempting to set details more than once causes an error.
 func (c *Command) DetailsFor(detail string, opts ...Option) error {
 	if c.detail != "" {
 		return wrap(ErrRedefined, c.name+" detail")
@@ -138,29 +139,18 @@ func (c *Command) DetailsFor(detail string, opts ...Option) error {
 	return nil
 }
 
-// lookupCmd returns the index of the matching *Command (or -1)
-func (c *Command) lookupCmd(arg string) int {
-	if c.clookup == nil {
-		return -1
+// Runs sets the handler for a Command.
+// Attempting to set more than one handler causes an error.
+func (c *Command) Runs(handler func(context.Context, Environ) error) error {
+	if c.handler != nil {
+		return wrap(ErrRedefined, c.name+" handler")
 	}
-	return c.clookup(arg)
+	c.handler = handler
+	return nil
 }
 
-func (c *Command) run(ctx context.Context, env Environ) error {
-	if c.handler == nil {
-		panic(c.name + ": not handled")
-	}
-	return c.handler(ctx, env)
-}
-
-// lookupFlag returns the index of the matching flag (or -1), and the index in arg after an = (or 0)
-func (c *Command) lookupFlag(arg string) (index, rem int) {
-	if c.flookup == nil {
-		return -1, 0
-	}
-	return c.flookup(arg)
-}
-
+// Flags sets the named options for a command.
+// Attempting to set them more than once causes an error.
 func (c *Command) Flags(flags ...Flag) error {
 	if c.flookup != nil {
 		return wrap(ErrRedefined, c.name+" flags")
@@ -220,6 +210,8 @@ func (c *Command) Flags(flags ...Flag) error {
 	return nil
 }
 
+// Args sets the positional options for a command.
+// Attempting to set them more than once causes an error.
 func (c *Command) Args(args ...Arg) error {
 	if c.args != nil {
 		return wrap(ErrRedefined, c.name+" args")
@@ -228,6 +220,8 @@ func (c *Command) Args(args ...Arg) error {
 	return nil
 }
 
+// Commands sets the named subcommands for a command.
+// Attempting to set them more than once causes an error.
 func (c *Command) Commands(cmds ...*Command) error {
 	if c.clookup != nil {
 		return wrap(ErrRedefined, c.name+" commands")
@@ -253,52 +247,25 @@ func (c *Command) Commands(cmds ...*Command) error {
 	return nil
 }
 
-type CmdOption interface {
-	applyCommand(*Command) error
-}
-
-type cmdOptionFunc func(*Command) error
-
-func (f cmdOptionFunc) applyCommand(cmd *Command) error {
-	return f(cmd)
-}
-
-func Flags(flags ...Flag) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Flags(flags...)
-	})
-}
-
-func Args(args ...Arg) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Args(args...)
-	})
-}
-
-func Commands(cmds ...*Command) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Commands(cmds...)
-	})
-}
-
-func Details(detail string) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Details(detail)
-	})
-}
-
-func DetailsFor(detail string, opts ...Option) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.DetailsFor(detail, opts...)
-	})
-}
-
-func applyOpts(cmd *Command, opts []CmdOption) error {
-	errs := make([]error, 0, len(opts))
-	for _, opt := range opts {
-		if err := opt.applyCommand(cmd); err != nil {
-			errs = append(errs, err)
-		}
+// lookupCmd returns the index of the matching *Command (or -1)
+func (c *Command) lookupCmd(arg string) int {
+	if c.clookup == nil {
+		return -1
 	}
-	return errors.Join(errs...)
+	return c.clookup(arg)
+}
+
+func (c *Command) run(ctx context.Context, env Environ) error {
+	if c.handler == nil {
+		panic(c.name + ": not handled")
+	}
+	return c.handler(ctx, env)
+}
+
+// lookupFlag returns the index of the matching flag (or -1), and the index in arg after an = (or 0)
+func (c *Command) lookupFlag(arg string) (index, rem int) {
+	if c.flookup == nil {
+		return -1, 0
+	}
+	return c.flookup(arg)
 }

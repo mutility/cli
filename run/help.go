@@ -14,6 +14,7 @@ func helpCommand(a *Application, cmd *Command) *Command {
 	}}
 }
 
+// PrintHelp writes usage information for this command to env.Stdout.
 func (c *Command) PrintHelp(ctx context.Context, env Environ, a *Application) error {
 	writeUsage(env.Stdout, a, c)
 	return nil
@@ -109,7 +110,9 @@ func writeUsage(w io.Writer, app *Application, cmd *Command) error {
 	if len(cmd.cmds) > 0 {
 		cmds := makeTable("Commands:")
 		for _, cmd := range cmd.cmds {
-			cmds.Add(cmd.name, cmd.desc)
+			if !cmd.unlisted {
+				cmds.Add(cmd.name, cmd.desc)
+			}
 		}
 		cmds.Write(w)
 		fmt.Fprintln(w, "\nRun \""+app.name+" <command> --help\" for more information on a command.")

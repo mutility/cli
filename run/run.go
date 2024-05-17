@@ -33,29 +33,6 @@ type Application struct {
 	allowGroupShortFlags bool
 }
 
-func (a *Application) Main(ctx context.Context) int {
-	env := DefaultEnviron()
-	if cmd, err := a.main(ctx, env); err != nil {
-		a.Ferror(env.Stderr, err)
-		return exitCode(err)
-	} else if err = cmd.run(ctx, env); err != nil {
-		a.Ferror(env.Stderr, err)
-		return exitCode(err)
-	}
-	return 0
-}
-
-func exitCode(err error) int {
-	if err == nil {
-		return 0
-	}
-	var ec interface{ ExitCode() int }
-	if errors.As(err, &ec) {
-		return ec.ExitCode()
-	}
-	return 1
-}
-
 func (a *Application) AllowGroupShortFlags(f bool) {
 	a.allowGroupShortFlags = f
 }
@@ -64,9 +41,10 @@ func (a *Application) Ferror(w io.Writer, err error) {
 	fmt.Fprintf(w, "%s: error: %v\n", a.Name(), err)
 }
 
-func (a *Application) MainEnv(ctx context.Context, env Environ) error {
-	env.fillDefaults()
-	cmd, err := a.main(ctx, env)
+// Main parses arguments and attemps to run the specified command handler.
+// If the command-line is invalid, it prints help for the selected command.
+func (a *Application) Main(ctx context.Context, env Environ) error {
+	cmd, err := a.Parse(env)
 	switch err := err.(type) {
 	case extraArgsError:
 		err.cmd.PrintHelp(ctx, env, a)
@@ -76,18 +54,17 @@ func (a *Application) MainEnv(ctx context.Context, env Environ) error {
 	if err != nil {
 		return err
 	}
-	if len(cmd.cmds) == 0 || cmd.handler != nil {
-		return cmd.run(ctx, env)
+
+	// non-leaf commands may have or omit a handler.
+	if cmd.handler == nil && len(cmd.cmds) > 0 {
+		// it's the user's mistake error to select a command with an omitted handler.
+		return missingCmdError{cmd}
 	}
-	return missingCmdError{cmd}
+	return cmd.run(ctx, env)
 }
 
-func (a *Application) ParseEnv(ctx context.Context, env Environ) (*Command, error) {
-	env.fillDefaults()
-	return a.main(ctx, env)
-}
-
-func (a *Application) main(ctx context.Context, env Environ) (*Command, error) {
+// Parse attemps to parse arguments and returns the selected command.
+func (a *Application) Parse(env Environ) (*Command, error) {
 	if len(env.Args) < 1 {
 		return nil, wrap(ErrMissing, "program name")
 	}

@@ -10,14 +10,14 @@ import (
 )
 
 func parseMain(app *run.Application, args ...string) {
-	_, err := app.ParseEnv(context.TODO(), run.Environ{Args: append(os.Args[:1:1], args...)})
+	_, err := app.Parse(run.DefaultEnviron().WithArgs(append(os.Args[:1:1], args...)))
 	if err != nil {
 		app.Ferror(os.Stdout, err)
 	}
 }
 
 func runMain(app *run.Application, args ...string) {
-	err := app.MainEnv(context.TODO(), run.Environ{Args: append(os.Args[:1:1], args...)})
+	err := app.Main(context.TODO(), run.DefaultEnviron().WithArgs(append(os.Args[:1:1], args...)))
 	if err != nil {
 		app.Ferror(os.Stdout, err)
 	}
@@ -133,6 +133,47 @@ func ExampleFileLikeSlice_many() {
 	// argVal: ["-" "-n"]
 }
 
+func ExampleIntSlice_many() {
+	try := func(args ...string) {
+		app := run.App("runtest", "testing ints")
+		argVal := run.IntSlice("arg", "", 0)
+		app.Args(argVal.Rest("arg"))
+		parseMain(app, args...)
+		fmt.Println("argVal:", argVal.Value())
+	}
+
+	try()
+	try("5")
+	try("6", "-2", "17")
+
+	// output:
+	// runtest: error: expected "<arg> ..."
+	// argVal: []
+	// argVal: [5]
+	// argVal: [6 -2 17]
+}
+
+func ExampleUintSlice_many() {
+	try := func(args ...string) {
+		app := run.App("runtest", "testing ints")
+		argVal := run.UintSlice("arg", "", 0)
+		app.Args(argVal.Rest("arg"))
+		parseMain(app, args...)
+		fmt.Println("argVal:", argVal.Value())
+	}
+
+	try()
+	try("5")
+	try("6", "-2", "17") // 6 gets saved before -2 fails the parse.
+
+	// output:
+	// runtest: error: expected "<arg> ..."
+	// argVal: []
+	// argVal: [5]
+	// runtest: error: unexpected flag: -2
+	// argVal: [6]
+}
+
 type quotedstring string
 
 func (qs quotedstring) String() string {
@@ -153,8 +194,8 @@ func ExampleStringLike() {
 func ExampleIntLike() {
 	try := func(args ...string) {
 		app := run.App("runtest", "testing IntLike")
-		i8 := run.IntLike[int8]("smallint", "")
-		u8 := run.UintLike[uint8]("smalluint", "")
+		i8 := run.IntLike[int8]("smallint", "", 10)
+		u8 := run.UintLike[uint8]("smalluint", "", 0)
 		app.Args(i8.Pos("i"), u8.Pos("u"))
 		parseMain(app, args...)
 		fmt.Println("i8:", i8.Value(), "u8:", u8.Value())
@@ -177,7 +218,7 @@ func ExampleIntLike() {
 // (Normally only single-digit negative numbers look like a short flag; others are treated as positional.)
 func ExampleApplication_AllowGroupShortFlags() {
 	app := run.App("runtest", "testing abbrev")
-	u := run.UintLike[uint8]("smallint", "")
+	u := run.UintLike[uint8]("smallint", "", 10)
 	app.Args(u.Pos("u"))
 	app.AllowGroupShortFlags(false) // default
 	parseMain(app, "-1")
@@ -193,9 +234,9 @@ func ExampleApplication_AllowGroupShortFlags() {
 	// runtest: error: unexpected flag: -100
 }
 
-func ExampleOneStringOf_enum() {
+func ExampleStringOf_enum() {
 	app := run.App("runtest", "testing enums")
-	letter := run.OneStringOf("letter", "", "alpha", "bravo", "charlie")
+	letter := run.StringOf("letter", "", "alpha", "bravo", "charlie")
 	app.Args(letter.Pos("abbrev"))
 	parseMain(app, "bravo")
 	fmt.Println("letter:", letter.Value())
@@ -206,9 +247,9 @@ func ExampleOneStringOf_enum() {
 	// runtest: error: abbrev: "delta" not one of "alpha", "bravo", "charlie"
 }
 
-func ExampleOneNameOf_enum() {
+func ExampleNamedOf_enum() {
 	app := run.App("runtest", "testing enums")
-	digit := run.OneNameOf("digit", "", []run.NamedValue[int]{
+	digit := run.NamedOf("digit", "", []run.NamedValue[int]{
 		{Name: "one", Value: 1},
 		{Name: "two", Value: 2},
 		{Name: "three", Value: 3},
@@ -220,6 +261,23 @@ func ExampleOneNameOf_enum() {
 
 	// output:
 	// digit: 2
+	// runtest: error: name: "four" not one of "one", "two", "three"
+}
+
+func ExampleNamedSliceOf_enum() {
+	app := run.App("runtest", "testing enums")
+	digit := run.NamedSliceOf("digit", "", []run.NamedValue[int]{
+		{Name: "one", Value: 1},
+		{Name: "two", Value: 2},
+		{Name: "three", Value: 3},
+	})
+	app.Args(digit.Rest("name"))
+	parseMain(app, "two", "three")
+	fmt.Println("digits:", digit.Value())
+	parseMain(app, "two", "four")
+
+	// output:
+	// digits: [2 3]
 	// runtest: error: name: "four" not one of "one", "two", "three"
 }
 
@@ -244,7 +302,7 @@ func ExampleApplication_Flags() {
 func ExampleFlag_Default() {
 	try := func(args ...string) {
 		app := run.App("runtest", "testing flag defaults")
-		digit := run.OneNameOf("digit", "", []run.NamedValue[int]{
+		digit := run.NamedOf("digit", "", []run.NamedValue[int]{
 			{Name: "one", Value: 1},
 			{Name: "two", Value: 2},
 			{Name: "three", Value: 3},
