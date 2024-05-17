@@ -210,6 +210,29 @@ func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string,
 	}
 }
 
+// FloatLike creates an option that stores any float-like value.
+// It converts strings like [strconv.ParseFloat].
+func FloatLike[T ~float32 | ~float64](name, desc string) option[T] {
+	var v T
+	parse := func(s string) error {
+		f, err := strconv.ParseFloat(s, int(unsafe.Sizeof(v))*8)
+		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
+			return fmt.Errorf("parsing %q as %T: %v", e.Num, v, e.Err)
+		}
+		if err != nil {
+			return err
+		}
+		v = T(f)
+		return nil
+	}
+	return option[T]{
+		name:  name,
+		desc:  desc,
+		value: &v,
+		parse: parse,
+	}
+}
+
 var errMissingArg = errors.New("no argument provided")
 
 func argParser(parse func(string) error) func(flagArgSource) error {

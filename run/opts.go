@@ -116,10 +116,11 @@ func IntSlice(name, desc string, base int) options[int] {
 // This differs from IntLike by supporting Rest().
 func IntLikeSlice[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) options[T] {
 	var v []T
+	var vt T
 	parse := func(s string) error {
-		i, err := strconv.ParseInt(s, base, int(unsafe.Sizeof(v[0]))*8)
+		i, err := strconv.ParseInt(s, base, int(unsafe.Sizeof(vt))*8)
 		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
-			return fmt.Errorf("parsing %q as %T: %v", e.Num, v, e.Err)
+			return fmt.Errorf("parsing %q as %T: %v", e.Num, vt, e.Err)
 		}
 		if err != nil {
 			return err
@@ -148,10 +149,36 @@ func UintSlice(name, desc string, base int) options[uint] {
 // This differs from UintLike by supporting Rest().
 func UintLikeSlice[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) options[T] {
 	var v []T
+	var vt T
 	parse := func(s string) error {
-		i, err := strconv.ParseUint(s, base, int(unsafe.Sizeof(v[0]))*8)
+		i, err := strconv.ParseUint(s, base, int(unsafe.Sizeof(vt))*8)
 		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
-			return fmt.Errorf("parsing %q as %T: %v", e.Num, v, e.Err)
+			return fmt.Errorf("parsing %q as %T: %v", e.Num, vt, e.Err)
+		}
+		if err != nil {
+			return err
+		}
+		v = append(v, T(i))
+		return nil
+	}
+	return options[T]{
+		name:  name,
+		desc:  desc,
+		value: &v,
+		parse: parse,
+	}
+}
+
+// FloatLikeSlice creates and option that stores a slice of float-like values.
+// It converts strings like [strconv.ParseFloat].
+// This differs from FloatLike by supporting Rest().
+func FloatLikeSlice[T ~float32 | ~float64](name, desc string) options[T] {
+	var v []T
+	var vt T
+	parse := func(s string) error {
+		i, err := strconv.ParseFloat(s, int(unsafe.Sizeof(vt))*8)
+		if e, ok := err.(*strconv.NumError); ok || errors.As(err, &e) {
+			return fmt.Errorf("parsing %q as %T: %v", e.Num, vt, e.Err)
 		}
 		if err != nil {
 			return err

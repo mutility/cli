@@ -144,12 +144,13 @@ func ExampleIntSlice_many() {
 
 	try()
 	try("5")
-	try("6", "-2", "17")
+	try("6", "-2", "17", "+-3")
 
 	// output:
 	// runtest: error: expected "<arg> ..."
 	// argVal: []
 	// argVal: [5]
+	// runtest: error: arg: parsing "+-3" as int: invalid syntax
 	// argVal: [6 -2 17]
 }
 
@@ -192,10 +193,12 @@ func ExampleStringLike() {
 }
 
 func ExampleIntLike() {
+	type myint int8
+	type myunt uint8
 	try := func(args ...string) {
 		app := run.App("runtest", "testing IntLike")
-		i8 := run.IntLike[int8]("smallint", "", 10)
-		u8 := run.UintLike[uint8]("smalluint", "", 0)
+		i8 := run.IntLike[myint]("smallint", "", 10)
+		u8 := run.UintLike[myunt]("smalluint", "", 0)
 		app.Args(i8.Pos("i"), u8.Pos("u"))
 		parseMain(app, args...)
 		fmt.Println("i8:", i8.Value(), "u8:", u8.Value())
@@ -207,9 +210,9 @@ func ExampleIntLike() {
 
 	// output:
 	// i8: -100 u8: 200
-	// runtest: error: u: parsing "-100" as uint8: invalid syntax
+	// runtest: error: u: parsing "-100" as run_test.myunt: invalid syntax
 	// i8: 100 u8: 0
-	// runtest: error: i: parsing "200" as int8: value out of range
+	// runtest: error: i: parsing "200" as run_test.myint: value out of range
 	// i8: 0 u8: 0
 }
 
@@ -245,6 +248,37 @@ func ExampleStringOf_enum() {
 	// output:
 	// letter: bravo
 	// runtest: error: abbrev: "delta" not one of "alpha", "bravo", "charlie"
+}
+
+func ExampleFloatLike_enum() {
+	app := run.App("runtest", "testing floats")
+	pct := run.FloatLike[float64]("pct", "")
+	app.Args(pct.Pos("pct"))
+	parseMain(app, "12.34")
+	fmt.Println("pct:", pct.Value())
+	parseMain(app, "12")
+	fmt.Println("pct:", pct.Value())
+	parseMain(app, ".34")
+	fmt.Println("pct:", pct.Value())
+	parseMain(app, "+-12.34")
+
+	// output:
+	// pct: 12.34
+	// pct: 12
+	// pct: 0.34
+	// runtest: error: pct: parsing "+-12.34" as float64: invalid syntax
+}
+
+func ExampleFloatLikeSlice_enum() {
+	app := run.App("runtest", "testing floats")
+	pcts := run.FloatLikeSlice[float64]("pcts", "")
+	app.Args(pcts.Rest("pct"))
+	parseMain(app, "12.34", "+12", "-.34", "+-12.34")
+	fmt.Println("pct:", pcts.Value())
+
+	// output:
+	// runtest: error: pct: parsing "+-12.34" as float64: invalid syntax
+	// pct: [12.34 12 -0.34]
 }
 
 func ExampleNamedOf_enum() {
