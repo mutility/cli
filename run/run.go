@@ -13,18 +13,24 @@ var (
 	ErrMissing   = errors.New("missing")
 )
 
-func App(name, desc string) *Application {
-	return &Application{
+// App creates an application and applies options.
+func App(name, desc string, opts ...CmdOption) (*Application, error) {
+	app := &Application{
 		Command: Command{
 			name: name,
 			desc: desc,
 		},
 	}
+	return app, applyOpts(&app.Command, opts)
 }
 
-func AppOpt(name, desc string, opts ...CmdOption) (*Application, error) {
-	app := App(name, desc)
-	return app, applyOpts(&app.Command, opts)
+// App creates an application, applies options, and panics on error.
+func MustApp(name, desc string, opts ...CmdOption) *Application {
+	app, err := App(name, desc, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return app
 }
 
 type Application struct {

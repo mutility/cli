@@ -78,15 +78,19 @@ func (a Arg) describe() string {
 	return desc
 }
 
-// Cmd creates a command.
-func Cmd(name, desc string) *Command {
-	return &Command{name: name, desc: desc}
+// Cmd creates a command and applies options.
+func Cmd(name, desc string, opts ...CmdOption) (*Command, error) {
+	cmd := &Command{name: name, desc: desc}
+	return cmd, applyOpts(cmd, opts)
 }
 
-// Cmd creates a command and applies options.
-func CmdOpt(name, desc string, opts ...CmdOption) (*Command, error) {
-	cmd := Cmd(name, desc)
-	return cmd, applyOpts(cmd, opts)
+// MustCmd creates a command, applies options, and panics on error.
+func MustCmd(name, desc string, opts ...CmdOption) *Command {
+	cmd, err := Cmd(name, desc, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return cmd
 }
 
 // A command is a 'verb' for an application.

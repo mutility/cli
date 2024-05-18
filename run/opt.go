@@ -67,15 +67,15 @@ type sliceOf[T any] struct{ value *T }
 func (s sliceOf[T]) Value() []T { return []T{*s.value} }
 
 // String creates an option that stores any string.
-func String(name, desc string) option[string] {
+func String(name, desc string) *option[string] {
 	return StringLike[string](name, desc)
 }
 
 // String creates an option that stores any string-like value.
-func StringLike[T ~string](name, desc string) option[T] {
+func StringLike[T ~string](name, desc string) *option[T] {
 	var v T
 	parse := func(s string) (T, error) { return T(s), nil }
-	return option[T]{
+	return &option[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -91,7 +91,7 @@ type NamedValue[T any] struct {
 
 // StringOf creates an option that stores a string-like value from the provided list.
 // This is suitable for small to medium sets of string-like names.
-func StringOf[T ~string](name, desc string, names ...T) option[T] {
+func StringOf[T ~string](name, desc string, names ...T) *option[T] {
 	nvs := make([]NamedValue[T], len(names))
 	for i, nam := range names {
 		nvs[i] = NamedValue[T]{Name: string(nam), Value: nam}
@@ -101,10 +101,10 @@ func StringOf[T ~string](name, desc string, names ...T) option[T] {
 
 // NamedOf creates an option that stores any type of value, looked up from the provided mapping.
 // This is suitable for small to medium sets of names.
-func NamedOf[T any](name, desc string, mapping []NamedValue[T]) option[T] {
+func NamedOf[T any](name, desc string, mapping []NamedValue[T]) *option[T] {
 	var v T
 	mapping = slices.Clone(mapping)
-	return option[T]{
+	return &option[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -126,13 +126,13 @@ func (nvs namedValues[T]) parse(arg string) (zero T, err error) {
 
 // File creates an option that stores a string filename.
 // This differs from String by accepting "-" as a positional argument.
-func File(name, desc string) option[string] {
+func File(name, desc string) *option[string] {
 	return FileLike[string](name, desc)
 }
 
 // FileLike creates an option that stores a string-like filename.
 // This differs from StringLike by accepting "-" as a positional argument.
-func FileLike[T ~string](name, desc string) option[T] {
+func FileLike[T ~string](name, desc string) *option[T] {
 	o := StringLike[T](name, desc)
 	o.strOK = dashOK
 	return o
@@ -142,15 +142,15 @@ var dashOK = []string{"-"}
 
 // Int creates an option that stores any int.
 // It converts strings like [strconv.ParseInt].
-func Int(name, desc string, base int) option[int] {
+func Int(name, desc string, base int) *option[int] {
 	return IntLike[int](name, desc, base)
 }
 
 // IntLike creates an option that stores any int-like value.
 // It converts strings like [strconv.ParseInt].
-func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) option[T] {
+func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) *option[T] {
 	var v T
-	return option[T]{
+	return &option[T]{
 		name:     name,
 		desc:     desc,
 		value:    &v,
@@ -161,15 +161,15 @@ func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base 
 
 // Uint creates an option that stores any uint.
 // It converts strings like [strconv.ParseUint].
-func Uint(name, desc string, base int) option[uint] {
+func Uint(name, desc string, base int) *option[uint] {
 	return UintLike[uint](name, desc, base)
 }
 
 // UintLike creates an option that stores any uint-like value.
 // It converts strings like [strconv.ParseUint].
-func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) option[T] {
+func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) *option[T] {
 	var v T
-	return option[T]{
+	return &option[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -179,9 +179,9 @@ func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string,
 
 // FloatLike creates an option that stores any float-like value.
 // It converts strings like [strconv.ParseFloat].
-func FloatLike[T ~float32 | ~float64](name, desc string) option[T] {
+func FloatLike[T ~float32 | ~float64](name, desc string) *option[T] {
 	var v T
-	return option[T]{
+	return &option[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,

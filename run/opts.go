@@ -47,18 +47,18 @@ func (o *options[T]) Rest(name string) Arg {
 
 // StringSlice creates and option that stores a slice of string values.
 // This differs from String by supporting Rest().
-func StringSlice(name, desc string) options[string] {
+func StringSlice(name, desc string) *options[string] {
 	return StringLikeSlice[string](name, desc)
 }
 
 // StringLikeSlice creates and option that stores a slice of string-like values.
 // This differs from StringLike by supporting Rest().
-func StringLikeSlice[T ~string](name, desc string) options[T] {
+func StringLikeSlice[T ~string](name, desc string) *options[T] {
 	var v []T
 	parse := func(s string) (T, error) {
 		return T(s), nil
 	}
-	return options[T]{
+	return &options[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -68,7 +68,7 @@ func StringLikeSlice[T ~string](name, desc string) options[T] {
 
 // StringSliceOf creates an option that stores a string-like slice of value from the provided list.
 // This is suitable for small to medium sets of string-like names.
-func StringSliceOf[T ~string](name, desc string, names ...T) options[T] {
+func StringSliceOf[T ~string](name, desc string, names ...T) *options[T] {
 	nvs := make([]NamedValue[T], len(names))
 	for i, nam := range names {
 		nvs[i] = NamedValue[T]{Name: string(nam), Value: nam}
@@ -78,10 +78,10 @@ func StringSliceOf[T ~string](name, desc string, names ...T) options[T] {
 
 // NamedSliceOf creates an option that stores a slice of any type of value, looked up from the provided mapping.
 // This is suitable for small to medium sets of names.
-func NamedSliceOf[T any](name, desc string, mapping []NamedValue[T]) options[T] {
+func NamedSliceOf[T any](name, desc string, mapping []NamedValue[T]) *options[T] {
 	var v []T
 	mapping = slices.Clone(mapping)
-	return options[T]{
+	return &options[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -92,14 +92,14 @@ func NamedSliceOf[T any](name, desc string, mapping []NamedValue[T]) options[T] 
 // FileSlice creates an option that stores a string slice of filenames.
 // This differs from StringSlice by accepting "-" as a positional argument,
 // and from File by supporting Rest().
-func FileSlice(name, desc string) options[string] {
+func FileSlice(name, desc string) *options[string] {
 	return FileLikeSlice[string](name, desc)
 }
 
 // FileLikeSlice creates an option that stores a string-like slice of filenames.
 // This differs from StringLikeSlice by accepting "-" as a positional argument,
 // and from FileLike by supporting Rest().
-func FileLikeSlice[T ~string](name, desc string) options[T] {
+func FileLikeSlice[T ~string](name, desc string) *options[T] {
 	o := StringLikeSlice[T](name, desc)
 	o.strOK = dashOK
 	return o
@@ -108,16 +108,16 @@ func FileLikeSlice[T ~string](name, desc string) options[T] {
 // IntSlice creates and option that stores a slice of int values.
 // It converts strings like [strconv.ParseInt].
 // This differs from Int by supporting Rest().
-func IntSlice(name, desc string, base int) options[int] {
+func IntSlice(name, desc string, base int) *options[int] {
 	return IntLikeSlice[int](name, desc, base)
 }
 
 // IntLikeSlice creates and option that stores a slice of int-like values.
 // It converts strings like [strconv.ParseInt].
 // This differs from IntLike by supporting Rest().
-func IntLikeSlice[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) options[T] {
+func IntLikeSlice[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) *options[T] {
 	var v []T
-	return options[T]{
+	return &options[T]{
 		name:     name,
 		desc:     desc,
 		value:    &v,
@@ -129,16 +129,16 @@ func IntLikeSlice[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, 
 // UintSlice creates and option that stores a slice of uint values.
 // It converts strings like [strconv.ParseUint].
 // This differs from Uint by supporting Rest().
-func UintSlice(name, desc string, base int) options[uint] {
+func UintSlice(name, desc string, base int) *options[uint] {
 	return UintLikeSlice[uint](name, desc, base)
 }
 
 // UintLikeSlice creates and option that stores a slice of uint-like values.
 // It converts strings like [strconv.ParseUint].
 // This differs from UintLike by supporting Rest().
-func UintLikeSlice[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) options[T] {
+func UintLikeSlice[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) *options[T] {
 	var v []T
-	return options[T]{
+	return &options[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -149,9 +149,9 @@ func UintLikeSlice[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc st
 // FloatLikeSlice creates and option that stores a slice of float-like values.
 // It converts strings like [strconv.ParseFloat].
 // This differs from FloatLike by supporting Rest().
-func FloatLikeSlice[T ~float32 | ~float64](name, desc string) options[T] {
+func FloatLikeSlice[T ~float32 | ~float64](name, desc string) *options[T] {
 	var v []T
-	return options[T]{
+	return &options[T]{
 		name:     name,
 		desc:     desc,
 		value:    &v,

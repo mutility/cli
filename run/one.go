@@ -55,9 +55,9 @@ func (o *flagOnly[T]) Slice() Param[[]T] {
 var errRepeated = errors.New("repeated")
 
 // Toggle creates an option that defaults to unseen, gets set to seen, and errors on repeat.
-func Enabler[T any](name, desc string, unseen, seen T) flagOnly[T] {
+func Enabler[T any](name, desc string, unseen, seen T) *flagOnly[T] {
 	enabled := false
-	return flagOnly[T]{
+	return &flagOnly[T]{
 		name:  name,
 		desc:  desc,
 		value: &unseen,
@@ -72,10 +72,10 @@ func Enabler[T any](name, desc string, unseen, seen T) flagOnly[T] {
 }
 
 // Toggler creates an option that toggles between two values, defaulting to the first.
-func Toggler[T any](name, desc string, unseen, seen T) flagOnly[T] {
+func Toggler[T any](name, desc string, unseen, seen T) *flagOnly[T] {
 	v := unseen
 	n := 0
-	return flagOnly[T]{
+	return &flagOnly[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
@@ -87,9 +87,9 @@ func Toggler[T any](name, desc string, unseen, seen T) flagOnly[T] {
 }
 
 // Accumulator creates an option that starts as initial, and adds increment every time it is seen.
-func Accumulator[T cmp.Ordered](name, desc string, initial, increment T) flagOnly[T] {
+func Accumulator[T cmp.Ordered](name, desc string, initial, increment T) *flagOnly[T] {
 	n := initial
-	return flagOnly[T]{
+	return &flagOnly[T]{
 		name:  name,
 		desc:  desc,
 		value: &initial,
