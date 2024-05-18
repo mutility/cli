@@ -10,35 +10,35 @@ type CmdOption interface {
 // Flags sets the named options for a Command.
 func Flags(flags ...Flag) CmdOption {
 	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Flags(flags...)
+		return cmd.SetFlags(flags...)
 	})
 }
 
 // Args sets the positional options for a Command.
 func Args(args ...Arg) CmdOption {
 	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Args(args...)
+		return cmd.SetArgs(args...)
 	})
 }
 
 // Commands sets the subcommands for a Command.
 func Commands(cmds ...*Command) CmdOption {
 	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Commands(cmds...)
+		return cmd.SetCommands(cmds...)
 	})
 }
 
 // Details sets extra help information for a Command.
 func Details(detail string) CmdOption {
 	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.Details(detail)
+		return cmd.SetDetails(detail)
 	})
 }
 
 // Details sets extra help information for a Command, and links it to options.
 func DetailsFor(detail string, opts ...Option) CmdOption {
 	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.DetailsFor(detail, opts...)
+		return cmd.SetDetailsFor(detail, opts...)
 	})
 }
 

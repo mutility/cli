@@ -48,9 +48,9 @@ func (a *Application) Main(ctx context.Context, env Environ) error {
 	switch err := err.(type) {
 	case nil:
 	case extraArgsError:
-		return errors.Join(err, err.cmd.PrintHelp(ctx, env, a))
+		return errors.Join(err, err.Command().PrintHelp(ctx, env, a))
 	case missingArgsError:
-		return errors.Join(err, err.cmd.PrintHelp(ctx, env, a))
+		return errors.Join(err, err.Command().PrintHelp(ctx, env, a))
 	default:
 		return err
 	}
@@ -58,27 +58,13 @@ func (a *Application) Main(ctx context.Context, env Environ) error {
 	// non-leaf commands may have or omit a handler.
 	if cmd.handler == nil && len(cmd.cmds) > 0 {
 		// it's the user's mistake error to select a command with an omitted handler.
-		return missingCmdError{cmd}
+		return missingCmdError{ec(cmd)}
 	}
 	return cmd.run(ctx, env)
 }
 
 // Parse attemps to parse arguments and returns the selected command.
 func (a *Application) Parse(env Environ) (*Command, error) {
-	// options should implement one or more of the following to indicate what they accept.
-	//   - flagParser is invoked for --name: parseFlag(); it accepts no arguments, and should not also implement valueParser
-	//   - inlineParser is invoked for --name=val: parseInline("val")
-	//   - valueParser is invoked for --name val: parseValue("val"), or positional ... val => parseValue("val")
-	//   - valuesParser is invoked for positional ... a b c => parseValue(["a", "b", "c"]), and returns the count it parsed.
-	//
-	// Common combos include inlineParser+valueParser, valuesParser with or without valueParser, and flagParser with or without inlineParser.
-	type (
-		flagParser   interface{ parseFlag() error }
-		inlineParser interface{ parseInline(string) error }
-		valueParser  interface{ parseValue(string) error }
-		valuesParser interface{ parseValues([]string) (int, error) }
-	)
-
 	if len(env.Args) < 1 {
 		return nil, wrap(ErrMissing, "program name")
 	}
@@ -112,29 +98,29 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 					switch parse := opt.option.(type) {
 					case flagParser: // --arg <ignored>
 						if err := parse.parseFlag(); err != nil {
-							return nil, flagParseError{cur, opt, arg, err}
+							return nil, flagParseError{ec(cur), opt, arg, err}
 						}
 						i += 1
 					case valueParser: // --arg val
 						if i+1 >= len(env.Args) {
-							return nil, missingFlagValueError{cur, opt, arg}
+							return nil, missingFlagValueError{ec(cur), opt, arg}
 						}
 						if err := parse.parseValue(env.Args[i+1]); err != nil {
-							return nil, flagParseError{cur, opt, arg, err}
+							return nil, flagParseError{ec(cur), opt, arg, err}
 						}
 						i += 2
 					default:
-						return nil, badFlagError{cur, opt, arg}
+						return nil, badFlagError{ec(cur), opt, arg}
 					}
 				default: // --arg=val; rem points to v
 					switch parse := opt.option.(type) {
 					case inlineParser:
 						if err := parse.parseInline(arg[rem:]); err != nil {
-							return nil, flagParseError{cur, opt, arg, err}
+							return nil, flagParseError{ec(cur), opt, arg, err}
 						}
 						i += 1
 					default:
-						return nil, extraFlagValueError{cur, arg}
+						return nil, extraFlagValueError{ec(cur), arg}
 					}
 				}
 				opt.valueSet = true
@@ -148,7 +134,7 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 			}
 
 			if maybeFlag(arg) && (carg >= len(cur.args) || !cur.args[carg].can(arg)) {
-				return nil, extraFlagError{cur, arg}
+				return nil, extraFlagError{ec(cur), arg}
 			}
 		}
 
@@ -160,7 +146,7 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 				if !canFlag {
 					took, err := parser.parseValues(args)
 					if err != nil {
-						return nil, argParseError{cur, opt, args[took], err}
+						return nil, argParseError{ec(cur), opt, args[took], err}
 					}
 					i += took
 				} else {
@@ -180,7 +166,7 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 					}
 					took, err := parser.parseValues(args)
 					if err != nil {
-						return nil, argParseError{cur, opt, args[took], err}
+						return nil, argParseError{ec(cur), opt, args[took], err}
 					}
 					i += took
 					if took > uncan {
@@ -191,11 +177,11 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 
 			case valueParser:
 				if err := parser.parseValue(arg); err != nil {
-					return nil, argParseError{cur, opt, arg, err}
+					return nil, argParseError{ec(cur), opt, arg, err}
 				}
 				i += 1
 			default:
-				return nil, badArgError{cur, opt, arg}
+				return nil, badArgError{ec(cur), opt, arg}
 			}
 			carg++
 			continue
@@ -210,18 +196,18 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 			continue
 		}
 
-		return nil, extraArgsError{cur, env.Args[i:]}
+		return nil, extraArgsError{ec(cur), env.Args[i:]}
 	}
 
 	if showHelp {
 		if cur.noHelp {
-			return nil, HelpDisabledError{cur}
+			return nil, HelpDisabledError{ec(cur)}
 		}
 		return helpCommand(a, cur), nil
 	}
 
 	if carg < len(cur.args) {
-		return nil, missingArgsError{cur, cur.args[carg:]}
+		return nil, missingArgsError{ec(cur), cur.args[carg:]}
 	}
 
 	for cmd := cur; cmd != nil; cmd = cmd.parent {
@@ -230,7 +216,7 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 			if flag.defaultSet && !flag.valueSet {
 				err := flag.option.parseDefault(flag.defaultString)
 				if err != nil {
-					return cur, flagParseError{cur, flag, flag.defaultString, err}
+					return cur, flagParseError{ec(cur), flag, flag.defaultString, err}
 				}
 			}
 		}
@@ -238,6 +224,20 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 
 	return cur, nil
 }
+
+// options should implement one or more of the following to indicate what they accept.
+//   - flagParser is invoked for --name: parseFlag(); it accepts no arguments, and should not also implement valueParser
+//   - inlineParser is invoked for --name=val: parseInline("val")
+//   - valueParser is invoked for --name val: parseValue("val"), or positional ... val => parseValue("val")
+//   - valuesParser is invoked for positional ... a b c => parseValue(["a", "b", "c"]), and returns the count it parsed.
+//
+// Common combos include inlineParser+valueParser, valuesParser with or without valueParser, and flagParser with or without inlineParser.
+type (
+	flagParser   interface{ parseFlag() error }
+	inlineParser interface{ parseInline(string) error }
+	valueParser  interface{ parseValue(string) error }
+	valuesParser interface{ parseValues([]string) (int, error) }
+)
 
 func wrap(e error, m string) error {
 	if e == nil {

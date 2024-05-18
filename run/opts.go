@@ -1,6 +1,7 @@
 package run
 
 import (
+	"fmt"
 	"slices"
 )
 
@@ -21,6 +22,7 @@ func (o *options[T]) parseDefault(arg string) error          { _, err := o.got([
 func (o *options[T]) parseValues(args []string) (int, error) { return o.got(args) }
 func (o *options[T]) okValues() []string                     { return o.strOK }
 func (o *options[T]) okPrefix() string                       { return o.prefixOK }
+func (o *options[T]) debug() string                          { return o.name + "=" + fmt.Sprint(*o.value) }
 
 func (o *options[T]) got(args []string) (int, error) {
 	*o.value = make([]T, 0, len(args))
@@ -36,9 +38,11 @@ func (o *options[T]) got(args []string) (int, error) {
 
 func (o *options[T]) Value() []T { return *o.value }
 
+// TODO: add FlagOn / FlagsOn, implemented as flags that split the string on a substring?
+
 // Rest returns an multi-Arg definition for this option with a custom alias.
 func (o *options[T]) Rest(name string) Arg {
-	return Arg{option: o, name: name, many: true}
+	return Arg{option: o, name: name}
 }
 
 // StringSlice creates and option that stores a slice of string values.

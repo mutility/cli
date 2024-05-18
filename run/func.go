@@ -6,7 +6,7 @@ import "context"
 type Handler func(context.Context, Environ) error
 
 func (h Handler) applyCommand(cmd *Command) error {
-	return cmd.Runs(h)
+	return cmd.SetHandler(h)
 }
 
 type Param[T any] interface{ Value() T }

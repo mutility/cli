@@ -15,6 +15,7 @@ type Option interface {
 	parseDefault(string) error
 	okValues() []string
 	okPrefix() string
+	debug() string
 }
 
 // Flag represents the named options for a Command.
@@ -35,6 +36,11 @@ func (f Flag) Default(string string) Flag {
 	return f
 }
 
+// Debug returns a helpful debugging string. It is not constrained by compatibility.
+func (f Flag) Debug() string {
+	return f.option.debug()
+}
+
 type flags []Flag
 
 func (f flags) searchRune(index int, r rune) int     { return cmp.Compare(f[index].rune, r) }
@@ -48,7 +54,11 @@ func (c commands) searchString(index int, s string) int { return cmp.Compare(c[i
 type Arg struct {
 	option Option
 	name   string
-	many   bool
+}
+
+// Debug returns a helpful debugging string. It is not constrained by compatibility.
+func (a Arg) Debug() string {
+	return a.option.debug()
 }
 
 func (a Arg) can(dashArg string) (ok bool) {
@@ -62,7 +72,7 @@ func (a Arg) can(dashArg string) (ok bool) {
 
 func (a Arg) describe() string {
 	desc := "<" + a.name + ">"
-	if a.many {
+	if _, ok := a.option.(valuesParser); ok {
 		desc += " ..."
 	}
 	return desc
@@ -98,6 +108,14 @@ type Command struct {
 	unlisted bool // don't list this command in its parents help
 }
 
+// Debug returns a helpful debugging string. It is not constrained by compatibility.
+func (c *Command) Debug() string {
+	if c == nil {
+		return "<nil>"
+	}
+	return c.Name()
+}
+
 // CommandName returns the hierarchical name for a command.
 //
 // For example, if this command represented git commit, it would return "commit".
@@ -124,9 +142,9 @@ func (c *Command) Name() string {
 	return strings.Join(parts, ".")
 }
 
-// Details sets extra help information for a Command.
+// SetDetails sets extra help information for a Command.
 // Attempting to set details more than once causes an error.
-func (c *Command) Details(detail string) error {
+func (c *Command) SetDetails(detail string) error {
 	if c.detail != "" {
 		return wrap(ErrRedefined, c.name+" detail")
 	}
@@ -134,11 +152,11 @@ func (c *Command) Details(detail string) error {
 	return nil
 }
 
-// Details sets extra help information for a Command, and links it to options.
+// SetDetailsFor sets extra help information for a Command, and links it to options.
 // Options reused in other commands will point to this command for further information.
 //
 // Attempting to set details more than once causes an error.
-func (c *Command) DetailsFor(detail string, opts ...Option) error {
+func (c *Command) SetDetailsFor(detail string, opts ...Option) error {
 	if c.detail != "" {
 		return wrap(ErrRedefined, c.name+" detail")
 	}
@@ -149,9 +167,9 @@ func (c *Command) DetailsFor(detail string, opts ...Option) error {
 	return nil
 }
 
-// Runs sets the handler for a Command.
+// SetHandler sets the handler for a Command.
 // Attempting to set more than one handler causes an error.
-func (c *Command) Runs(handler func(context.Context, Environ) error) error {
+func (c *Command) SetHandler(handler func(context.Context, Environ) error) error {
 	if c.handler != nil {
 		return wrap(ErrRedefined, c.name+" handler")
 	}
@@ -159,9 +177,17 @@ func (c *Command) Runs(handler func(context.Context, Environ) error) error {
 	return nil
 }
 
-// Flags sets the named options for a command.
+// Flags returns a copy of the flags previously set.
+func (c *Command) Flags() []Flag {
+	if c == nil {
+		return nil
+	}
+	return slices.Clone(c.flags)
+}
+
+// SetFlags sets the named options for a command.
 // Attempting to set them more than once causes an error.
-func (c *Command) Flags(flags ...Flag) error {
+func (c *Command) SetFlags(flags ...Flag) error {
 	if c.flookup != nil {
 		return wrap(ErrRedefined, c.name+" flags")
 	}
@@ -220,9 +246,17 @@ func (c *Command) Flags(flags ...Flag) error {
 	return nil
 }
 
-// Args sets the positional options for a command.
+// Args returns a copy of the args previously set.
+func (c *Command) Args() []Arg {
+	if c == nil {
+		return nil
+	}
+	return slices.Clone(c.args)
+}
+
+// SetArgs sets the positional options for a command.
 // Attempting to set them more than once causes an error.
-func (c *Command) Args(args ...Arg) error {
+func (c *Command) SetArgs(args ...Arg) error {
 	if c.args != nil {
 		return wrap(ErrRedefined, c.name+" args")
 	}
@@ -230,9 +264,17 @@ func (c *Command) Args(args ...Arg) error {
 	return nil
 }
 
-// Commands sets the named subcommands for a command.
+// Commands returns a copy of the commands previously set.
+func (c *Command) Commands() []*Command {
+	if c == nil {
+		return nil
+	}
+	return slices.Clone(c.cmds)
+}
+
+// SetCommands sets the named subcommands for a command.
 // Attempting to set them more than once causes an error.
-func (c *Command) Commands(cmds ...*Command) error {
+func (c *Command) SetCommands(cmds ...*Command) error {
 	if c.clookup != nil {
 		return wrap(ErrRedefined, c.name+" commands")
 	}

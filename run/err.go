@@ -6,12 +6,25 @@ import (
 	"strings"
 )
 
+type errCmd Command
+
+func ec(cmd *Command) *errCmd { return (*errCmd)(cmd) }
+
+func (e *errCmd) Command() *Command { return (*Command)(e) }
+func (e *errCmd) msg(s ...string) string {
+	msg := strings.Join(s, ": ")
+	if e.parent == nil {
+		return msg
+	}
+	return e.Command().CommandName() + ": " + msg
+}
+
 type HelpDisabledError struct {
-	cmd *Command
+	*errCmd
 }
 
 func (e HelpDisabledError) Error() string {
-	return withCommand(e.cmd, "help requested")
+	return e.msg("help requested")
 }
 
 type NotOneOfError[T any] struct {
@@ -31,78 +44,78 @@ func (e NotOneOfError[T]) Error() string {
 }
 
 type missingFlagValueError struct {
-	cmd   *Command
+	*errCmd
 	flag  *Flag
 	after string
 }
 
 func (e missingFlagValueError) Error() string {
 	hint := cmp.Or(e.flag.hint, "<value>")
-	return withCommand(e.cmd, e.after, "expected "+hint)
+	return e.msg(e.after, "expected "+hint)
 }
 
 type missingCmdError struct {
-	cmd *Command
+	*errCmd
 }
 
 func (e missingCmdError) Error() string {
-	return withCommand(e.cmd, "expected <command>")
+	return e.msg("expected <command>")
 }
 
 type extraFlagValueError struct {
-	cmd *Command
+	*errCmd
 	arg string
 }
 
 func (e extraFlagValueError) Error() string {
-	return withCommand(e.cmd, "unexpected flag value", e.arg)
+	return e.msg("unexpected flag value", e.arg)
 }
 
 type flagParseError struct {
-	cmd  *Command
+	*errCmd
 	flag *Flag
 	val  string
 	err  error
 }
 
 func (e flagParseError) Error() string {
-	return withCommand(e.cmd, e.val, e.err.Error())
+	return e.msg(e.val, e.err.Error())
 }
 
 type argParseError struct {
-	cmd *Command
+	*errCmd
 	arg *Arg
 	val string
 	err error
 }
 
 func (e argParseError) Error() string {
-	return withCommand(e.cmd, e.arg.name, e.err.Error())
+	return e.msg(e.arg.name, e.err.Error())
 }
 
 type extraFlagError struct {
-	cmd  *Command
+	*errCmd
 	flag string
 }
 
 func (e extraFlagError) Error() string {
-	return withCommand(e.cmd, "unexpected flag", e.flag)
+	return e.msg("unexpected flag", e.flag)
 }
 
 type extraArgsError struct {
-	cmd  *Command
+	*errCmd
 	args []string
 }
 
 func (e extraArgsError) Error() string {
 	if len(e.args) == 1 {
-		return withCommand(e.cmd, "unexpected argument", strconv.Quote(e.args[0]))
+		return e.msg("unexpected argument", strconv.Quote(e.args[0]))
 	}
-	return withCommand(e.cmd, "unexpected arguments", strings.Join(e.args, " "))
+	return e.msg("unexpected arguments", strings.Join(e.args, " "))
 }
 
 type missingArgsError struct {
-	cmd  *Command
+	*errCmd
 	args []Arg
 }
 
@@ -110,37 +123,29 @@ func (e missingArgsError) Error() string {
 	a := make([]string, len(e.args))
 	for i, arg := range e.args {
 		a[i] = "<" + arg.name + ">"
-		if arg.many {
+		if _, ok := arg.option.(valuesParser); ok {
 			a[i] += " ..."
 		}
 	}
-	return withCommand(e.cmd, "expected "+strconv.Quote(strings.Join(a, " ")))
+	return e.msg("expected " + strconv.Quote(strings.Join(a, " ")))
 }
 
 type badFlagError struct {
-	cmd  *Command
+	*errCmd
 	flag *Flag
 	at   string
 }
 
 func (e badFlagError) Error() string {
-	return withCommand(e.cmd, "broken flag", e.at)
+	return e.msg("broken flag", e.at)
 }
 
 type badArgError struct {
-	cmd *Command
+	*errCmd
 	arg *Arg
 	at  string
 }
 
 func (e badArgError) Error() string {
-	return withCommand(e.cmd, "broken argument", e.at)
-}
-
-func withCommand(cmd *Command, s ...string) string {
-	msg := strings.Join(s, ": ")
-	if cmd.parent == nil {
-		return msg
-	}
-	return cmd.CommandName() + ": " + msg
+	return e.msg("broken argument", e.at)
 }
