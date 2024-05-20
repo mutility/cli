@@ -54,9 +54,11 @@ func (a *Application) Main(ctx context.Context, env Environ) error {
 	switch err := err.(type) {
 	case nil:
 	case extraArgsError:
-		return errors.Join(err, err.Command().PrintHelp(ctx, env, a))
+		cmd := err.Command()
+		return errors.Join(err, cmd.PrintHelp(Context{ctx, env, cmd}, a))
 	case missingArgsError:
-		return errors.Join(err, err.Command().PrintHelp(ctx, env, a))
+		cmd := err.Command()
+		return errors.Join(err, cmd.PrintHelp(Context{ctx, env, cmd}, a))
 	default:
 		return err
 	}
@@ -65,7 +67,7 @@ func (a *Application) Main(ctx context.Context, env Environ) error {
 	if err != nil {
 		return err
 	}
-	return handler(ctx, env)
+	return handler(Context{ctx, env, cmd})
 }
 
 // Parse attemps to parse arguments and returns the selected command.

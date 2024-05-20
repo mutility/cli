@@ -1,7 +1,6 @@
 package run
 
 import (
-	"context"
 	"fmt"
 	"go/doc/comment"
 	"io"
@@ -9,14 +8,14 @@ import (
 )
 
 func helpCommand(a *Application, cmd *Command) *Command {
-	return &Command{handler: func(ctx context.Context, env Environ) error {
-		return cmd.PrintHelp(ctx, env, a)
+	return &Command{handler: func(ctx Context) error {
+		return cmd.PrintHelp(ctx, a)
 	}}
 }
 
 // PrintHelp writes usage information for this command to env.Stdout.
-func (c *Command) PrintHelp(ctx context.Context, env Environ, a *Application) error {
-	return writeUsage(env.Stdout, a, c)
+func (c *Command) PrintHelp(ctx Context, a *Application) error {
+	return writeUsage(ctx.Stdout, a, c)
 }
 
 func writeUsage(w io.Writer, app *Application, cmd *Command) error {

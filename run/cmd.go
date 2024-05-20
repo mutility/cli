@@ -2,7 +2,6 @@ package run
 
 import (
 	"cmp"
-	"context"
 	"slices"
 	"strings"
 )
@@ -159,7 +158,7 @@ func (c *Command) SetDetailsFor(detail string, opts ...Option) error {
 
 // SetHandler sets the handler for a Command.
 // Attempting to set more than one handler causes an error.
-func (c *Command) SetHandler(handler func(context.Context, Environ) error) error {
+func (c *Command) SetHandler(handler Handler) error {
 	if c.handler != nil {
 		return wrap(ErrRedefined, c.name+" handler")
 	}

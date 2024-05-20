@@ -2,7 +2,6 @@
 package run_test
 
 import (
-	"context"
 	"net/url"
 	"strconv"
 
@@ -399,7 +398,7 @@ func ExampleFlag_Default() {
 func ExampleApplication_Ferror() {
 	app := run.MustApp("commands", "",
 		run.MustCmd("foo", "does foo"),
-		run.MustCmd("bar", "does bar", run.Handler(func(context.Context, run.Environ) error { return nil })),
+		run.MustCmd("bar", "does bar", run.Handler(func(run.Context) error { return nil })),
 	)
 
 	env := run.DefaultEnviron()
