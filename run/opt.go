@@ -18,14 +18,15 @@ type option[T any] struct {
 	see      []*Command
 }
 
-func (o *option[T]) description() string           { return o.desc }
-func (o *option[T]) seeAlso() []*Command           { return o.see }
-func (o *option[T]) setSeeAlso(cmds ...*Command)   { o.see = cmds }
-func (o *option[T]) okValues() []string            { return o.strOK }
-func (o *option[T]) okPrefix() string              { return o.prefixOK }
-func (o *option[T]) parseDefault(arg string) error { return o.got(arg, false) }
-func (o *option[T]) parseInline(arg string) error  { return o.got(arg, true) }
-func (o *option[T]) parseValue(arg string) error   { return o.got(arg, true) }
+func (o *option[T]) description() string               { return o.desc }
+func (o *option[T]) seeAlso() []*Command               { return o.see }
+func (o *option[T]) setSeeAlso(cmds ...*Command)       { o.see = cmds }
+func (o *option[T]) okValues() []string                { return o.strOK }
+func (o *option[T]) okPrefix() string                  { return o.prefixOK }
+func (o *option[T]) parseDefault(arg string) error     { return o.got(arg, false) }
+func (o *option[T]) parseInline(arg string) error      { return o.got(arg, true) }
+func (o *option[T]) parseValue(arg string) error       { return o.got(arg, true) }
+func (o *option[T]) withPrefixOK(ok string) *option[T] { o.prefixOK = ok; return o }
 
 func (o *option[T]) got(arg string, real bool) error {
 	v, err := o.parse(arg)
@@ -72,14 +73,8 @@ func String(name, desc string) *option[string] {
 
 // String creates an option that stores any string-like value.
 func StringLike[T ~string](name, desc string) *option[T] {
-	var v T
 	parse := func(s string) (T, error) { return T(s), nil }
-	return &option[T]{
-		name:  name,
-		desc:  desc,
-		value: &v,
-		parse: parse,
-	}
+	return Parser(name, desc, parse)
 }
 
 type NamedValue[T any] struct {
@@ -101,14 +96,8 @@ func StringOf[T ~string](name, desc string, names ...T) *option[T] {
 // NamedOf creates an option that stores any type of value, looked up from the provided mapping.
 // This is suitable for small to medium sets of names.
 func NamedOf[T any](name, desc string, mapping []NamedValue[T]) *option[T] {
-	var v T
 	mapping = slices.Clone(mapping)
-	return &option[T]{
-		name:  name,
-		desc:  desc,
-		value: &v,
-		parse: (namedValues[T])(mapping).parse,
-	}
+	return Parser(name, desc, (namedValues[T])(mapping).parse)
 }
 
 type namedValues[T any] []NamedValue[T]
@@ -148,14 +137,7 @@ func Int(name, desc string, base int) *option[int] {
 // IntLike creates an option that stores any int-like value.
 // It converts strings like [strconv.ParseInt].
 func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) *option[T] {
-	var v T
-	return &option[T]{
-		name:     name,
-		desc:     desc,
-		value:    &v,
-		parse:    parseIntLike[T](base),
-		prefixOK: "-",
-	}
+	return Parser(name, desc, parseIntLike[T](base)).withPrefixOK("-")
 }
 
 // Uint creates an option that stores any uint.
@@ -167,24 +149,23 @@ func Uint(name, desc string, base int) *option[uint] {
 // UintLike creates an option that stores any uint-like value.
 // It converts strings like [strconv.ParseUint].
 func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) *option[T] {
-	var v T
-	return &option[T]{
-		name:  name,
-		desc:  desc,
-		value: &v,
-		parse: parseUintLike[T](base),
-	}
+	return Parser(name, desc, parseUintLike[T](base))
 }
 
 // FloatLike creates an option that stores any float-like value.
 // It converts strings like [strconv.ParseFloat].
 func FloatLike[T ~float32 | ~float64](name, desc string) *option[T] {
+	return Parser(name, desc, parseFloatLike[T]).withPrefixOK("-")
+}
+
+// Parser creates an option that converts with the provided parse function.
+func Parser[T any](name, desc string, parse func(string) (T, error)) *option[T] {
 	var v T
 	return &option[T]{
 		name:  name,
 		desc:  desc,
 		value: &v,
-		parse: parseFloatLike[T],
+		parse: parse,
 	}
 }
 

@@ -4,6 +4,7 @@ package run_test
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 
@@ -516,4 +517,50 @@ func ExampleAccumulator() {
 	//   cmd: accum
 	//   flag: ha=""
 	//   flag: no=0
+}
+
+func ExampleParser() {
+	try := func(args ...string) {
+		run.MustApp("parser", "", run.Args(
+			run.Parser("url", "", url.ParseRequestURI).Pos("url"),
+		)).Debug(args...)
+	}
+
+	try("rel")
+	try("schema:relative")
+	try("schema:/rooted")
+	try("https://example.com/")
+
+	// output:
+	// [rel] err: url: parse "rel": invalid URI for request
+	//   cmd: parser
+	//   arg: url=<nil>
+	// [schema:relative]
+	//   cmd: parser
+	//   arg: url=schema:relative
+	// [schema:/rooted]
+	//   cmd: parser
+	//   arg: url=schema:/rooted
+	// [https://example.com/]
+	//   cmd: parser
+	//   arg: url=https://example.com/
+}
+
+func ExampleParserSlice() {
+	try := func(args ...string) {
+		run.MustApp("parser", "", run.Args(
+			run.ParserSlice("urls", "", url.ParseRequestURI).Rest("url"),
+		)).Debug(args...)
+	}
+
+	try("rel")
+	try("schema:relative", "schema:/rooted", "https://example.com/")
+
+	// output:
+	// [rel] err: url: parse "rel": invalid URI for request
+	//   cmd: parser
+	//   arg: urls=[]
+	// [schema:relative schema:/rooted https://example.com/]
+	//   cmd: parser
+	//   arg: urls=[schema:relative schema:/rooted https://example.com/]
 }
