@@ -36,11 +36,6 @@ func (f Flag) Default(string string) Flag {
 	return f
 }
 
-// Debug returns a helpful debugging string. It is not constrained by compatibility.
-func (f Flag) Debug() string {
-	return f.option.debug()
-}
-
 type flags []Flag
 
 func (f flags) searchRune(index int, r rune) int     { return cmp.Compare(f[index].rune, r) }
@@ -54,11 +49,6 @@ func (c commands) searchString(index int, s string) int { return cmp.Compare(c[i
 type Arg struct {
 	option Option
 	name   string
-}
-
-// Debug returns a helpful debugging string. It is not constrained by compatibility.
-func (a Arg) Debug() string {
-	return a.option.debug()
 }
 
 func (a Arg) can(dashArg string) (ok bool) {
@@ -110,14 +100,6 @@ type Command struct {
 	handler  func(context.Context, Environ) error
 	noHelp   bool // don't offer -h|--help for this command
 	unlisted bool // don't list this command in its parents help
-}
-
-// Debug returns a helpful debugging string. It is not constrained by compatibility.
-func (c *Command) Debug() string {
-	if c == nil {
-		return "<nil>"
-	}
-	return c.Name()
 }
 
 // CommandName returns the hierarchical name for a command.

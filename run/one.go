@@ -3,7 +3,6 @@ package run
 import (
 	"cmp"
 	"errors"
-	"fmt"
 )
 
 type flagOnly[T any] struct {
@@ -21,7 +20,6 @@ func (o *flagOnly[T]) okValues() []string            { return nil }
 func (o *flagOnly[T]) okPrefix() string              { return "" }
 func (o *flagOnly[T]) parseDefault(arg string) error { return o.got(false) }
 func (o *flagOnly[T]) parseFlag() error              { return o.got(true) }
-func (o *flagOnly[T]) debug() string                 { return o.name + "=" + fmt.Sprint(*o.value) }
 
 func (o *flagOnly[T]) got(real bool) error {
 	v, err := o.seen()

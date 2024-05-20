@@ -1,7 +1,6 @@
 package run
 
 import (
-	"fmt"
 	"slices"
 )
 
@@ -22,7 +21,6 @@ func (o *options[T]) parseDefault(arg string) error          { _, err := o.got([
 func (o *options[T]) parseValues(args []string) (int, error) { return o.got(args) }
 func (o *options[T]) okValues() []string                     { return o.strOK }
 func (o *options[T]) okPrefix() string                       { return o.prefixOK }
-func (o *options[T]) debug() string                          { return o.name + "=" + fmt.Sprint(*o.value) }
 
 func (o *options[T]) got(args []string) (int, error) {
 	*o.value = make([]T, 0, len(args))

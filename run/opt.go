@@ -26,7 +26,6 @@ func (o *option[T]) okPrefix() string              { return o.prefixOK }
 func (o *option[T]) parseDefault(arg string) error { return o.got(arg, false) }
 func (o *option[T]) parseInline(arg string) error  { return o.got(arg, true) }
 func (o *option[T]) parseValue(arg string) error   { return o.got(arg, true) }
-func (o *option[T]) debug() string                 { return o.name + "=" + fmt.Sprint(*o.value) }
 
 func (o *option[T]) got(arg string, real bool) error {
 	v, err := o.parse(arg)
