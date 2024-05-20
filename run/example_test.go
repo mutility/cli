@@ -3,20 +3,11 @@ package run_test
 
 import (
 	"context"
-	"fmt"
 	"net/url"
-	"os"
 	"strconv"
 
 	"github.com/mutility/cli/run"
 )
-
-func runMain(app *run.Application, args ...string) {
-	err := app.Main(context.TODO(), run.DefaultEnviron().WithArgs(append(os.Args[:1:1], args...)))
-	if err != nil {
-		app.Ferror(os.Stdout, err)
-	}
-}
 
 func ExampleApp_empty() {
 	app, _ := run.App("noarg", "")
@@ -405,20 +396,32 @@ func ExampleFlag_Default() {
 	//   flag: digit=0
 }
 
-func ExampleMustCmd() {
+func ExampleApplication_Ferror() {
 	app := run.MustApp("commands", "",
-		run.MustCmd("foo", "does foo", run.Handler(func(context.Context, run.Environ) error { _, err := fmt.Println("running foo"); return err })),
-		run.MustCmd("bar", "does bar", run.Handler(func(context.Context, run.Environ) error { _, err := fmt.Println("running bar"); return err })),
+		run.MustCmd("foo", "does foo"),
+		run.MustCmd("bar", "does bar", run.Handler(func(context.Context, run.Environ) error { return nil })),
 	)
 
-	runMain(app)
-	runMain(app, "foo")
-	runMain(app, "bar")
+	env := run.DefaultEnviron()
+	_, err := app.DebugEnv(env)
+	app.Ferror(env.Stdout, err)
+	_, err = app.DebugEnv(env, "foo")
+	app.Ferror(env.Stdout, err)
+	_, err = app.DebugEnv(env, "bar")
+	app.Ferror(env.Stdout, err)
 
 	// output:
+	// []
+	//   cmd: commands
+	//   sub: foo
+	//   sub: bar
 	// commands: error: expected <command>
-	// running foo
-	// running bar
+	// [foo]
+	//   cmd: commands.foo
+	// commands: error: foo: no handler
+	// [bar]
+	//   cmd: commands.bar
+	// commands: error: <nil>
 }
 
 func ExampleEnabler() {

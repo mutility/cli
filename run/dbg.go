@@ -5,12 +5,12 @@ import (
 )
 
 // Debug parses command line arguments, printing any resulting error, selected command, and its options.
-func (a *Application) Debug(args ...string) {
-	a.DebugEnv(DefaultEnviron(), args...)
+func (a *Application) Debug(args ...string) (*Command, error) {
+	return a.DebugEnv(DefaultEnviron(), args...)
 }
 
 // DebugEnv parses command line arguments, printing any resulting error, selected command, and its options.
-func (a *Application) DebugEnv(env Environ, args ...string) {
+func (a *Application) DebugEnv(env Environ, args ...string) (*Command, error) {
 	cmd, err := a.Parse(env.WithArgs(append(env.Args[:1:1], args...)))
 	if err != nil {
 		fmt.Fprintln(env.Stdout, args, "err:", err)
@@ -20,7 +20,9 @@ func (a *Application) DebugEnv(env Environ, args ...string) {
 	} else {
 		fmt.Fprintln(env.Stdout, args)
 		cmd.debug(env)
+		_, err = cmd.lookupHandler()
 	}
+	return cmd, err
 }
 
 // debug returns a helpful debugging string. It is not constrained by compatibility.
@@ -36,7 +38,7 @@ func (c *Command) debug(env Environ) {
 			fmt.Fprintln(env.Stdout, "  arg:", a.option.debug())
 		}
 		for _, c := range c.Commands() {
-			fmt.Fprintln(env.Stdout, "  cmd:", c.name)
+			fmt.Fprintln(env.Stdout, "  sub:", c.name)
 		}
 	}
 }

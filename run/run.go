@@ -61,12 +61,11 @@ func (a *Application) Main(ctx context.Context, env Environ) error {
 		return err
 	}
 
-	// non-leaf commands may have or omit a handler.
-	if cmd.handler == nil && len(cmd.cmds) > 0 {
-		// it's the user's mistake error to select a command with an omitted handler.
-		return missingCmdError{ec(cmd)}
+	handler, err := cmd.lookupHandler()
+	if err != nil {
+		return err
 	}
-	return cmd.run(ctx, env)
+	return handler(ctx, env)
 }
 
 // Parse attemps to parse arguments and returns the selected command.

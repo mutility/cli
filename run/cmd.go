@@ -101,7 +101,7 @@ type Command struct {
 	clookup func(arg string) int              // returns index in cmds of matching *Command (or -1)
 	flookup func(arg string) (index, rem int) // returns index in flags of matching flag (or -1), index in arg after = (or 0)
 
-	handler  func(context.Context, Environ) error
+	handler  Handler
 	noHelp   bool // don't offer -h|--help for this command
 	unlisted bool // don't list this command in its parents help
 }
@@ -299,17 +299,23 @@ func (c *Command) lookupCmd(arg string) int {
 	return c.clookup(arg)
 }
 
-func (c *Command) run(ctx context.Context, env Environ) error {
-	if c.handler == nil {
-		panic(c.name + ": not handled")
-	}
-	return c.handler(ctx, env)
-}
-
 // lookupFlag returns the index of the matching flag (or -1), and the index in arg after an = (or 0)
 func (c *Command) lookupFlag(arg string) (index, rem int) {
 	if c.flookup == nil {
 		return -1, 0
 	}
 	return c.flookup(arg)
+}
+
+func (c *Command) lookupHandler() (Handler, error) {
+	// non-leaf commands may have or omit a handler.
+	if c.handler == nil {
+		// authoring error to omit a handler on a leaf command
+		if len(c.cmds) == 0 {
+			return nil, noHandlerError{ec(c)}
+		}
+		// it's the user's mistake error to select a command with an omitted handler.
+		return nil, missingCmdError{ec(c)}
+	}
+	return c.handler, nil
 }

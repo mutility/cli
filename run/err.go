@@ -66,6 +66,12 @@ func (e missingCmdError) Error() string {
 	return e.msg("expected <command>")
 }
 
+type noHandlerError struct{ *errCmd }
+
+func (e noHandlerError) Error() string {
+	return e.msg("no handler")
+}
+
 type extraFlagValueError struct {
 	*errCmd
 	arg string
