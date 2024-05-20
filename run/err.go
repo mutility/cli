@@ -19,6 +19,10 @@ func (e *errCmd) msg(s ...string) string {
 	return e.Command().CommandName() + ": " + msg
 }
 
+type errNotGrouped struct{}
+
+func (errNotGrouped) Error() string { return "pseudo-option not grouped" }
+
 type HelpDisabledError struct {
 	*errCmd
 }

@@ -51,8 +51,8 @@ func (o *option[T]) Flag() Flag {
 	return Flag{option: o, string: o.name}
 }
 
-// Pos returns an Arg definition for this option with a custom alias.
-func (o *option[T]) Pos(name string) Arg {
+// Arg returns an Arg definition for this option with a custom alias.
+func (o *option[T]) Arg(name string) Arg {
 	return Arg{option: o, name: name}
 }
 

@@ -7,27 +7,6 @@ type CmdOption interface {
 	applyCommand(*Command) error
 }
 
-// Flags sets the named options for a Command.
-func Flags(flags ...Flag) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.SetFlags(flags...)
-	})
-}
-
-// Args sets the positional options for a Command.
-func Args(args ...Arg) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.SetArgs(args...)
-	})
-}
-
-// Commands sets the subcommands for a Command.
-func Commands(cmds ...*Command) CmdOption {
-	return cmdOptionFunc(func(cmd *Command) error {
-		return cmd.SetCommands(cmds...)
-	})
-}
-
 // Details sets extra help information for a Command.
 func Details(detail string) CmdOption {
 	return cmdOptionFunc(func(cmd *Command) error {
@@ -50,10 +29,34 @@ func (f cmdOptionFunc) applyCommand(cmd *Command) error {
 
 func applyOpts(cmd *Command, opts []CmdOption) error {
 	errs := make([]error, 0, len(opts))
+	var flags []Flag
+	var args []Arg
+	var cmds []*Command
 	for _, opt := range opts {
-		if err := opt.applyCommand(cmd); err != nil {
-			errs = append(errs, err)
+		switch o := opt.(type) {
+		case Flag:
+			flags = append(flags, o)
+		case Arg:
+			args = append(args, o)
+		case *Command:
+			cmds = append(cmds, o)
+		default:
+			if err := opt.applyCommand(cmd); err != nil {
+				errs = append(errs, err)
+			}
 		}
 	}
+	errs = appendOptSlice(errs, cmd.SetFlags, flags)
+	errs = appendOptSlice(errs, cmd.SetArgs, args)
+	errs = appendOptSlice(errs, cmd.SetCommands, cmds)
 	return errors.Join(errs...)
+}
+
+func appendOptSlice[T any](errs []error, apply func(...T) error, s []T) []error {
+	if len(s) > 0 {
+		if err := apply(s...); err != nil {
+			return append(errs, err)
+		}
+	}
+	return errs
 }

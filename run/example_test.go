@@ -28,7 +28,7 @@ func ExampleApp_empty() {
 }
 
 func ExampleMustApp_empty() {
-	app := run.MustApp("nah", "", run.Flags(), run.Args())
+	app := run.MustApp("nah", "")
 	app.SetCommands()
 	app.Debug("hello")
 
@@ -50,7 +50,7 @@ func ExampleString() {
 	try := func(args ...string) {
 		app := run.MustApp("str", "")
 		argVal := run.String("arg", "")
-		app.SetArgs(argVal.Pos("arg"))
+		app.SetArgs(argVal.Arg("arg"))
 		app.Debug(args...)
 	}
 
@@ -80,7 +80,7 @@ func ExampleString() {
 
 func ExampleFileLike() {
 	try := func(args ...string) {
-		app, _ := run.App("file", "", run.Args(run.FileLike[quotedstring]("arg", "").Pos("arg")))
+		app, _ := run.App("file", "", run.FileLike[quotedstring]("arg", "").Arg("arg"))
 		app.Debug(args...)
 	}
 
@@ -110,7 +110,7 @@ func ExampleFileLike() {
 
 func ExampleFileLikeSlice_many() {
 	try := func(args ...string) {
-		app := run.MustApp("files", "", run.Args(run.FileLikeSlice[quotedstring]("args", "").Rest("arg")))
+		app := run.MustApp("files", "", run.FileLikeSlice[quotedstring]("args", "").Args("arg"))
 		app.Debug(args...)
 	}
 
@@ -156,7 +156,7 @@ func ExampleFileLikeSlice_many() {
 
 func ExampleIntSlice_many() {
 	try := func(args ...string) {
-		app := run.MustApp("ints", "", run.Args(run.IntSlice("arg", "", 0).Rest("arg")))
+		app := run.MustApp("ints", "", run.IntSlice("arg", "", 0).Args("arg"))
 		app.Debug(args...)
 	}
 
@@ -178,7 +178,7 @@ func ExampleIntSlice_many() {
 
 func ExampleUintSlice_many() {
 	try := func(args ...string) {
-		app := run.MustApp("uints", "", run.Args(run.UintSlice("arg", "", 0).Rest("arg")))
+		app := run.MustApp("uints", "", run.UintSlice("arg", "", 0).Args("arg"))
 		app.Debug(args...)
 	}
 
@@ -205,7 +205,7 @@ func (qs quotedstring) String() string {
 }
 
 func ExampleStringLike() {
-	app := run.MustApp("quoted", "", run.Args(run.StringLike[quotedstring]("files", "").Pos("file")))
+	app := run.MustApp("quoted", "", run.StringLike[quotedstring]("files", "").Arg("file"))
 	app.Debug("hello")
 
 	// output:
@@ -218,7 +218,7 @@ func ExampleIntLike() {
 	type myint int8
 	type myunt uint8
 	try := func(args ...string) {
-		app := run.MustApp("intish", "", run.Args(run.IntLike[myint]("i8", "", 10).Pos("i"), run.UintLike[myunt]("u8", "", 0).Pos("u")))
+		app := run.MustApp("intish", "", run.IntLike[myint]("i8", "", 10).Arg("i"), run.UintLike[myunt]("u8", "", 0).Arg("u"))
 		app.Debug(args...)
 	}
 
@@ -247,7 +247,7 @@ func ExampleIntLike() {
 func ExampleApplication_AllowGroupShortFlags() {
 	app := run.MustApp("shorts", "")
 	u := run.UintLike[uint8]("u8", "", 10)
-	app.SetArgs(u.Pos("u"))
+	app.SetArgs(u.Arg("u"))
 	app.AllowGroupShortFlags(false) // default
 	app.Debug("-1")
 	app.Debug("-100")
@@ -271,7 +271,7 @@ func ExampleApplication_AllowGroupShortFlags() {
 }
 
 func ExampleStringOf_enum() {
-	app := run.MustApp("enum", "", run.Args(run.StringOf[quotedstring]("letter", "", "alpha", "bravo", "charlie").Pos("abbrev")))
+	app := run.MustApp("enum", "", run.StringOf[quotedstring]("letter", "", "alpha", "bravo", "charlie").Arg("abbrev"))
 	app.Debug("delta")
 	app.Debug("bravo")
 
@@ -285,7 +285,7 @@ func ExampleStringOf_enum() {
 }
 
 func ExampleFloatLike() {
-	app := run.MustApp("floaty", "", run.Args(run.FloatLike[float64]("pct", "").Pos("pct")))
+	app := run.MustApp("floaty", "", run.FloatLike[float64]("pct", "").Arg("pct"))
 	app.Debug("+-12.34")
 	app.Debug("12.34")
 	app.Debug("12")
@@ -307,7 +307,7 @@ func ExampleFloatLike() {
 }
 
 func ExampleFloatLikeSlice() {
-	app := run.MustApp("floats", "", run.Args(run.FloatLikeSlice[float64]("pcts", "").Rest("pct")))
+	app := run.MustApp("floats", "", run.FloatLikeSlice[float64]("pcts", "").Args("pct"))
 	app.Debug("12.34", "+12", "-.34", "+-12.34")
 
 	// output:
@@ -322,7 +322,7 @@ func ExampleNamedOf() {
 		{Name: "two", Value: 2},
 		{Name: "three", Value: 3},
 	})
-	app := run.MustApp("named", "", run.Args(digit.Pos("d")))
+	app := run.MustApp("named", "", digit.Arg("d"))
 	app.Debug("four")
 	app.Debug("two")
 	app.Debug("four")
@@ -345,7 +345,7 @@ func ExampleNamedSliceOf() {
 		{Name: "two", Value: 2},
 		{Name: "three", Value: 3},
 	})
-	app := run.MustApp("nameds", "", run.Args(digit.Rest("digit")))
+	app := run.MustApp("nameds", "", digit.Args("digit"))
 	app.Debug("two", "three")
 	app.Debug("two", "four")
 
@@ -405,11 +405,11 @@ func ExampleFlag_Default() {
 	//   flag: digit=0
 }
 
-func ExampleCommands() {
-	app := run.MustApp("commands", "", run.Commands(
+func ExampleMustCmd() {
+	app := run.MustApp("commands", "",
 		run.MustCmd("foo", "does foo", run.Handler(func(context.Context, run.Environ) error { _, err := fmt.Println("running foo"); return err })),
 		run.MustCmd("bar", "does bar", run.Handler(func(context.Context, run.Environ) error { _, err := fmt.Println("running bar"); return err })),
-	))
+	)
 
 	runMain(app)
 	runMain(app, "foo")
@@ -423,7 +423,7 @@ func ExampleCommands() {
 
 func ExampleEnabler() {
 	try := func(args ...string) {
-		app := run.MustApp("enable", "", run.Flags(run.Enabler("en", "", false, true).Flag()))
+		app := run.MustApp("enable", "", run.Enabler("en", "", false, true).Flag())
 		app.Debug(args...)
 	}
 
@@ -449,7 +449,7 @@ func ExampleEnabler() {
 
 func ExampleToggler() {
 	try := func(args ...string) {
-		app := run.MustApp("toggle", "", run.Flags(run.Toggler("en", "", false, true).Flag()))
+		app := run.MustApp("toggle", "", run.Toggler("en", "", false, true).Flag())
 		app.Debug(args...)
 	}
 
@@ -479,10 +479,10 @@ func ExampleToggler() {
 
 func ExampleAccumulator() {
 	try := func(args ...string) {
-		app := run.MustApp("accum", "", run.Flags(
+		run.MustApp("accum", "",
 			run.Accumulator[quotedstring]("ha", "", "", "ha").Flag(),
-			run.Accumulator("no", "", 0, -2).Flag()))
-		app.Debug(args...)
+			run.Accumulator("no", "", 0, -2).Flag(),
+		).Debug(args...)
 	}
 
 	try()
@@ -521,9 +521,9 @@ func ExampleAccumulator() {
 
 func ExampleParser() {
 	try := func(args ...string) {
-		run.MustApp("parser", "", run.Args(
-			run.Parser("url", "", url.ParseRequestURI).Pos("url"),
-		)).Debug(args...)
+		run.MustApp("parser", "",
+			run.Parser("url", "", url.ParseRequestURI).Arg("url"),
+		).Debug(args...)
 	}
 
 	try("rel")
@@ -548,9 +548,9 @@ func ExampleParser() {
 
 func ExampleParserSlice() {
 	try := func(args ...string) {
-		run.MustApp("parser", "", run.Args(
-			run.ParserSlice("urls", "", url.ParseRequestURI).Rest("url"),
-		)).Debug(args...)
+		run.MustApp("parser", "",
+			run.ParserSlice("urls", "", url.ParseRequestURI).Args("url"),
+		).Debug(args...)
 	}
 
 	try("rel")

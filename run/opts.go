@@ -39,8 +39,8 @@ func (o *options[T]) Value() []T { return *o.value }
 
 // TODO: add FlagOn / FlagsOn, implemented as flags that split the string on a substring?
 
-// Rest returns an multi-Arg definition for this option with a custom alias.
-func (o *options[T]) Rest(name string) Arg {
+// Args returns an multi-Arg definition for this option with a custom alias.
+func (o *options[T]) Args(name string) Arg {
 	return Arg{option: o, name: name}
 }
 

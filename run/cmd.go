@@ -36,6 +36,8 @@ func (f Flag) Default(string string) Flag {
 	return f
 }
 
+func (Flag) applyCommand(*Command) error { return errNotGrouped{} }
+
 type flags []Flag
 
 func (f flags) searchRune(index int, r rune) int     { return cmp.Compare(f[index].rune, r) }
@@ -50,6 +52,8 @@ type Arg struct {
 	option Option
 	name   string
 }
+
+func (Arg) applyCommand(*Command) error { return errNotGrouped{} }
 
 func (a Arg) can(dashArg string) (ok bool) {
 	if slices.Contains(a.option.okValues(), dashArg) {
@@ -284,6 +288,8 @@ func (c *Command) SetCommands(cmds ...*Command) error {
 
 	return nil
 }
+
+func (*Command) applyCommand(*Command) error { return errNotGrouped{} }
 
 // lookupCmd returns the index of the matching *Command (or -1)
 func (c *Command) lookupCmd(arg string) int {
