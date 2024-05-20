@@ -11,23 +11,29 @@ import (
 func ExampleApp_empty() {
 	app, _ := run.App("noarg", "")
 	app.Debug()
+	app.Debug("--help")
 
 	// output:
 	// []
 	//   cmd: noarg
+	// [--help]
+	//   cmd: noarg.--help
 }
 
-func ExampleMustApp_empty() {
-	app := run.MustApp("nah", "")
+func ExampleNoHelp() {
+	app := run.MustApp("nohelp", "", run.NoHelp())
 	app.SetCommands()
 	app.Debug("hello")
+	app.Debug("--help")
 
 	// output:
 	// [hello] err: unexpected argument: "hello"
-	//   cmd: nah
+	//   cmd: nohelp
+	// [--help] err: unexpected flag: --help
+	//   cmd: nohelp
 }
 
-func Example_nil() {
+func ExampleMustApp() {
 	app := run.MustApp("noway", "")
 	app.Debug("hello")
 

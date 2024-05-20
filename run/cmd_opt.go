@@ -21,6 +21,13 @@ func DetailsFor(detail string, opts ...Option) CmdOption {
 	})
 }
 
+func NoHelp() CmdOption {
+	return cmdOptionFunc(func(cmd *Command) error {
+		cmd.noHelp = true
+		return nil
+	})
+}
+
 type cmdOptionFunc func(*Command) error
 
 func (f cmdOptionFunc) applyCommand(cmd *Command) error {

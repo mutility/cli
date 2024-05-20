@@ -56,7 +56,7 @@ func (o *option[T]) Arg(name string) Arg {
 	return Arg{option: o, name: name}
 }
 
-// Slice returns a Param that converts a T to a []T.
+// Slice returns a Param that produces a slice containing its value.
 // This can be used to share a handler between single and slice options.
 func (o *option[T]) Slice() Param[[]T] {
 	return sliceOf[T]{o.value}

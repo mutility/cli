@@ -8,7 +8,7 @@ import (
 )
 
 func helpCommand(a *Application, cmd *Command) *Command {
-	return &Command{handler: func(ctx Context) error {
+	return &Command{name: cmd.Name() + ".--help", handler: func(ctx Context) error {
 		return cmd.PrintHelp(ctx, a)
 	}}
 }
@@ -50,26 +50,30 @@ func writeUsage(w io.Writer, app *Application, cmd *Command) error {
 		args := makeTable("Arguments:")
 		for _, arg := range cmd.args {
 			args.Add(arg.describe(), arg.option.description())
+			for _, also := range arg.option.seeAlso() {
+				if cmd != also {
+					args.Add("", fmt.Sprintf("(See %s %s --help)", app.name, also.name))
+				}
+			}
+
 		}
 		args.Write(w)
 	}
 
 	// commands have help at least help flags, unless suppressed
 	if len(cmd.flags) > 0 || !cmd.noHelp {
-		anyRuneString := false
+		anyRuneString := !app.noHelp // help includes a rune+string
 		for _, flag := range cmd.flags {
 			if flag.rune != 0 && flag.string != "" {
 				anyRuneString = true
 			}
 		}
-		type flagInfo struct {
-			flag Flag
-			name string
-			desc string
-			rel  []string
+
+		flags := makeTable("Flags:")
+		flags.Max = 22
+		if !cmd.noHelp {
+			flags.Add("-h, --help", "Show context-sensitive help.")
 		}
-		info := make([]flagInfo, 0, len(cmd.flags)+1)
-		info = append(info, flagInfo{Flag{}, "-h, --help", "Show context-sensitive help.", nil})
 		for _, flag := range cmd.flags {
 			var names []string
 			if flag.rune != 0 {
@@ -79,27 +83,20 @@ func writeUsage(w io.Writer, app *Application, cmd *Command) error {
 				names = append(names, "--"+flag.string)
 			}
 			name := strings.Join(names, ", ")
-			if (anyRuneString || !app.noHelp) && flag.rune == 0 {
+			if anyRuneString && flag.rune == 0 {
 				name = "    " + name
 			}
-			var see []string
 			if flag.defaultSet {
 				name += "=" + flag.defaultString
 			} else if p := flag.hint; p != "" {
 				name += "=" + p
 			}
-			for _, cmd := range flag.option.seeAlso() {
-				see = append(see, fmt.Sprintf("(See %s %s --help)", app.name, cmd.name))
-			}
-			info = append(info, flagInfo{flag: flag, name: name, desc: flag.option.description(), rel: see})
-		}
 
-		flags := makeTable("Flags:")
-		flags.Max = 22
-		for _, flag := range info {
-			flags.Add(flag.name, flag.desc)
-			for _, see := range flag.rel {
-				flags.Add("", see)
+			flags.Add(name, flag.option.description())
+			for _, also := range flag.option.seeAlso() {
+				if cmd != also {
+					flags.Add("", fmt.Sprintf("(See %s %s --help)", app.name, also.name))
+				}
 			}
 		}
 		flags.Write(w)
