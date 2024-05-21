@@ -25,20 +25,20 @@ func (a *Application) DebugEnv(env Environ, args ...string) (*Command, error) {
 	return cmd, err
 }
 
-// debug returns a helpful debugging string. It is not constrained by compatibility.
 func (c *Command) debug(env Environ) {
 	if c == nil {
 		fmt.Fprintln(env.Stdout, "  cmd: <nil>")
 	} else {
 		fmt.Fprintln(env.Stdout, "  cmd:", c.Name())
-		for _, f := range c.Flags() {
-			fmt.Fprintln(env.Stdout, "  flag:", f.option.debug())
+		for cmd, prefix := c, "  flag:"; cmd != nil; cmd, prefix = cmd.parent, "  "+prefix {
+			for _, f := range cmd.Flags() {
+				fmt.Fprintln(env.Stdout, prefix, f.option.debug())
+			}
 		}
-		for _, a := range c.Args() {
-			fmt.Fprintln(env.Stdout, "  arg:", a.option.debug())
-		}
-		for _, c := range c.Commands() {
-			fmt.Fprintln(env.Stdout, "  sub:", c.name)
+		for cmd, prefix := c, "  arg:"; cmd != nil; cmd, prefix = cmd.parent, "  "+prefix {
+			for _, a := range cmd.Args() {
+				fmt.Fprintln(env.Stdout, prefix, a.option.debug())
+			}
 		}
 	}
 }

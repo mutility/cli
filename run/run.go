@@ -89,6 +89,7 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 		maybeFlag = func(arg string) bool { return strings.HasPrefix(arg, "-") }
 	}
 
+nextArg:
 	for i := 1; i < len(env.Args); {
 		arg := env.Args[i]
 		if canFlag {
@@ -98,40 +99,42 @@ func (a *Application) Parse(env Environ) (*Command, error) {
 				continue
 			}
 
-			if idx, rem := cur.lookupFlag(arg); idx >= 0 && canFlag {
-				opt := &cur.flags[idx]
-				switch rem {
-				case 0: // --arg possibly with following val
-					switch parse := opt.option.(type) {
-					case flagParser: // --arg <ignored>
-						if err := parse.parseFlag(); err != nil {
-							return nil, flagParseError{ec(cur), opt, arg, err}
+			for cmd := cur; cmd != nil; cmd = cmd.parent {
+				if idx, rem := cmd.lookupFlag(arg); idx >= 0 && canFlag {
+					opt := &cmd.flags[idx]
+					switch rem {
+					case 0: // --arg possibly with following val
+						switch parse := opt.option.(type) {
+						case flagParser: // --arg <ignored>
+							if err := parse.parseFlag(); err != nil {
+								return nil, flagParseError{ec(cmd), opt, arg, err}
+							}
+							i += 1
+						case valueParser: // --arg val
+							if i+1 >= len(env.Args) {
+								return nil, missingFlagValueError{ec(cmd), opt, arg}
+							}
+							if err := parse.parseValue(env.Args[i+1]); err != nil {
+								return nil, flagParseError{ec(cmd), opt, arg, err}
+							}
+							i += 2
+						default:
+							return nil, badFlagError{ec(cmd), opt, arg}
 						}
-						i += 1
-					case valueParser: // --arg val
-						if i+1 >= len(env.Args) {
-							return nil, missingFlagValueError{ec(cur), opt, arg}
+					default: // --arg=val; rem points to v
+						switch parse := opt.option.(type) {
+						case inlineParser:
+							if err := parse.parseInline(arg[rem:]); err != nil {
+								return nil, flagParseError{ec(cmd), opt, arg, err}
+							}
+							i += 1
+						default:
+							return nil, extraFlagValueError{ec(cmd), arg}
 						}
-						if err := parse.parseValue(env.Args[i+1]); err != nil {
-							return nil, flagParseError{ec(cur), opt, arg, err}
-						}
-						i += 2
-					default:
-						return nil, badFlagError{ec(cur), opt, arg}
 					}
-				default: // --arg=val; rem points to v
-					switch parse := opt.option.(type) {
-					case inlineParser:
-						if err := parse.parseInline(arg[rem:]); err != nil {
-							return nil, flagParseError{ec(cur), opt, arg, err}
-						}
-						i += 1
-					default:
-						return nil, extraFlagValueError{ec(cur), arg}
-					}
+					opt.valueSet = true
+					continue nextArg
 				}
-				opt.valueSet = true
-				continue
 			}
 
 			if !cur.noHelp && (arg == "-h" || arg == "--help") {

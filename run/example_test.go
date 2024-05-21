@@ -42,6 +42,46 @@ func ExampleMustApp() {
 	//   cmd: noway
 }
 
+func Example_nesting() {
+	try := func(args ...string) {
+		run.MustApp("outer", "",
+			run.Enabler("f", "", false, true).Flag(),
+			run.MustCmd("inner", "",
+				run.Enabler("g", "", false, true).Flag(),
+			),
+		).Debug(args...)
+	}
+	try("-h")
+	try("-h", "inner")
+	try("inner", "-h")
+	try("--f")
+	try("--g")
+	try("--f", "inner", "--g")
+	try("inner", "--f", "--g")
+
+	// output:
+	// [-h]
+	//   cmd: outer.--help
+	// [-h inner]
+	//   cmd: outer.inner.--help
+	// [inner -h]
+	//   cmd: outer.inner.--help
+	// [--f]
+	//   cmd: outer
+	//   flag: f=true
+	// [--g] err: unexpected flag: --g
+	//   cmd: outer
+	//   flag: f=false
+	// [--f inner --g]
+	//   cmd: outer.inner
+	//   flag: g=true
+	//     flag: f=true
+	// [inner --f --g]
+	//   cmd: outer.inner
+	//   flag: g=true
+	//     flag: f=true
+}
+
 func ExampleString() {
 	try := func(args ...string) {
 		app := run.MustApp("str", "")
@@ -418,8 +458,6 @@ func ExampleApplication_Ferror() {
 	// output:
 	// []
 	//   cmd: commands
-	//   sub: foo
-	//   sub: bar
 	// commands: error: expected <command>
 	// [foo]
 	//   cmd: commands.foo
