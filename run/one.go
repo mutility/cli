@@ -52,13 +52,19 @@ func (o *flagOnly[T]) Slice() Param[[]T] {
 
 var errRepeated = errors.New("repeated")
 
-// Toggle creates an option that defaults to unseen, gets set to seen, and errors on repeat.
+// Enabler creates an option that defaults to unseen, gets set to seen, and errors on repeat.
 func Enabler[T any](name, desc string, unseen, seen T) *flagOnly[T] {
+	v := unseen
+	return EnablerVar(&v, name, desc, seen)
+}
+
+// EnablerVar creates an option that defaults to unseen, gets set to seen, and errors on repeat.
+func EnablerVar[T any](p *T, name, desc string, seen T) *flagOnly[T] {
 	enabled := false
 	return &flagOnly[T]{
 		name:  name,
 		desc:  desc,
-		value: &unseen,
+		value: p,
 		seen: func() (T, error) {
 			if enabled {
 				return seen, errRepeated
@@ -72,28 +78,40 @@ func Enabler[T any](name, desc string, unseen, seen T) *flagOnly[T] {
 // Toggler creates an option that toggles between two values, defaulting to the first.
 func Toggler[T any](name, desc string, unseen, seen T) *flagOnly[T] {
 	v := unseen
+	return TogglerVar(&v, name, desc, seen)
+}
+
+// TogglerVar creates an option that toggles between two values, defaulting to the first.
+func TogglerVar[T any](p *T, name, desc string, seen T) *flagOnly[T] {
+	toggle := [2]T{*p, seen}
 	n := 0
 	return &flagOnly[T]{
 		name:  name,
 		desc:  desc,
-		value: &v,
+		value: p,
 		seen: func() (T, error) {
 			n++
-			return []T{unseen, seen}[n%2], nil
+			return toggle[n%2], nil
 		},
 	}
 }
 
 // Accumulator creates an option that starts as initial, and adds increment every time it is seen.
 func Accumulator[T cmp.Ordered](name, desc string, initial, increment T) *flagOnly[T] {
-	n := initial
+	v := initial
+	return AccumulatorVar(&v, name, desc, increment)
+}
+
+// AccumulatorVar creates an option that starts as initial, and adds increment every time it is seen.
+func AccumulatorVar[T cmp.Ordered](p *T, name, desc string, increment T) *flagOnly[T] {
+	v := *p
 	return &flagOnly[T]{
 		name:  name,
 		desc:  desc,
-		value: &initial,
+		value: p,
 		seen: func() (T, error) {
-			n += increment
-			return n, nil
+			v += increment
+			return v, nil
 		},
 	}
 }

@@ -27,6 +27,7 @@ func (o *option[T]) parseDefault(arg string) error     { return o.got(arg, false
 func (o *option[T]) parseInline(arg string) error      { return o.got(arg, true) }
 func (o *option[T]) parseValue(arg string) error       { return o.got(arg, true) }
 func (o *option[T]) withPrefixOK(ok string) *option[T] { o.prefixOK = ok; return o }
+func (o *option[T]) withStrOK(ok []string) *option[T]  { o.strOK = ok; return o }
 
 func (o *option[T]) got(arg string, real bool) error {
 	v, err := o.parse(arg)
@@ -71,10 +72,21 @@ func String(name, desc string) *option[string] {
 	return StringLike[string](name, desc)
 }
 
-// String creates an option that stores any string-like value.
+// StringVar creates an option that stores any string.
+func StringVar(p *string, name, desc string) *option[string] {
+	return StringLikeVar(p, name, desc)
+}
+
+// StringLike creates an option that stores any string-like value.
 func StringLike[T ~string](name, desc string) *option[T] {
 	parse := func(s string) (T, error) { return T(s), nil }
 	return Parser(name, desc, parse)
+}
+
+// StringLikeVar creates an option that stores any string-like value.
+func StringLikeVar[T ~string](p *T, name, desc string) *option[T] {
+	parse := func(s string) (T, error) { return T(s), nil }
+	return ParserVar(p, name, desc, parse)
 }
 
 type NamedValue[T any] struct {
@@ -86,11 +98,18 @@ type NamedValue[T any] struct {
 // StringOf creates an option that stores a string-like value from the provided list.
 // This is suitable for small to medium sets of string-like names.
 func StringOf[T ~string](name, desc string, names ...T) *option[T] {
+	var v T
+	return StringVarOf(&v, name, desc, names...)
+}
+
+// StringVarOf creates an option that stores a string-like value from the provided list.
+// This is suitable for small to medium sets of string-like names.
+func StringVarOf[T ~string](p *T, name, desc string, names ...T) *option[T] {
 	nvs := make([]NamedValue[T], len(names))
 	for i, nam := range names {
 		nvs[i] = NamedValue[T]{Name: string(nam), Value: nam}
 	}
-	return NamedOf(name, desc, nvs)
+	return NamedVarOf(p, name, desc, nvs)
 }
 
 // NamedOf creates an option that stores any type of value, looked up from the provided mapping.
@@ -98,6 +117,13 @@ func StringOf[T ~string](name, desc string, names ...T) *option[T] {
 func NamedOf[T any](name, desc string, mapping []NamedValue[T]) *option[T] {
 	mapping = slices.Clone(mapping)
 	return Parser(name, desc, (namedValues[T])(mapping).parse)
+}
+
+// NamedVarOf creates an option that stores any type of value, looked up from the provided mapping.
+// This is suitable for small to medium sets of names.
+func NamedVarOf[T any](p *T, name, desc string, mapping []NamedValue[T]) *option[T] {
+	mapping = slices.Clone(mapping)
+	return ParserVar(p, name, desc, (namedValues[T])(mapping).parse)
 }
 
 type namedValues[T any] []NamedValue[T]
@@ -118,12 +144,23 @@ func File(name, desc string) *option[string] {
 	return FileLike[string](name, desc)
 }
 
+// FileVar creates an option that stores a string filename.
+// This differs from String by accepting "-" as a positional argument.
+func FileVar(p *string, name, desc string) *option[string] {
+	return FileLikeVar(p, name, desc)
+}
+
 // FileLike creates an option that stores a string-like filename.
 // This differs from StringLike by accepting "-" as a positional argument.
 func FileLike[T ~string](name, desc string) *option[T] {
-	o := StringLike[T](name, desc)
-	o.strOK = dashOK
-	return o
+	var v T
+	return FileLikeVar(&v, name, desc)
+}
+
+// FileLikeVar creates an option that stores a string-like filename.
+// This differs from StringLike by accepting "-" as a positional argument.
+func FileLikeVar[T ~string](p *T, name, desc string) *option[T] {
+	return StringLikeVar[T](p, name, desc).withStrOK(dashOK)
 }
 
 var dashOK = []string{"-"}
@@ -134,10 +171,22 @@ func Int(name, desc string, base int) *option[int] {
 	return IntLike[int](name, desc, base)
 }
 
+// IntVar creates an option that stores any int.
+// It converts strings like [strconv.ParseInt].
+func IntVar(p *int, name, desc string, base int) *option[int] {
+	return IntLikeVar(p, name, desc, base)
+}
+
 // IntLike creates an option that stores any int-like value.
 // It converts strings like [strconv.ParseInt].
 func IntLike[T ~int | ~int8 | ~int16 | ~int32 | ~int64](name, desc string, base int) *option[T] {
 	return Parser(name, desc, parseIntLike[T](base)).withPrefixOK("-")
+}
+
+// IntLikeVar creates an option that stores any int-like value.
+// It converts strings like [strconv.ParseInt].
+func IntLikeVar[T ~int | ~int8 | ~int16 | ~int32 | ~int64](p *T, name, desc string, base int) *option[T] {
+	return ParserVar(p, name, desc, parseIntLike[T](base)).withPrefixOK("-")
 }
 
 // Uint creates an option that stores any uint.
@@ -146,10 +195,22 @@ func Uint(name, desc string, base int) *option[uint] {
 	return UintLike[uint](name, desc, base)
 }
 
+// UintVar creates an option that stores any uint.
+// It converts strings like [strconv.ParseUint].
+func UintVar(p *uint, name, desc string, base int) *option[uint] {
+	return UintLikeVar(p, name, desc, base)
+}
+
 // UintLike creates an option that stores any uint-like value.
 // It converts strings like [strconv.ParseUint].
 func UintLike[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](name, desc string, base int) *option[T] {
 	return Parser(name, desc, parseUintLike[T](base))
+}
+
+// UintLikeVar creates an option that stores any uint-like value.
+// It converts strings like [strconv.ParseUint].
+func UintLikeVar[T ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64](p *T, name, desc string, base int) *option[T] {
+	return ParserVar(p, name, desc, parseUintLike[T](base))
 }
 
 // FloatLike creates an option that stores any float-like value.
@@ -158,13 +219,24 @@ func FloatLike[T ~float32 | ~float64](name, desc string) *option[T] {
 	return Parser(name, desc, parseFloatLike[T]).withPrefixOK("-")
 }
 
+// FloatLikeVar creates an option that stores any float-like value.
+// It converts strings like [strconv.ParseFloat].
+func FloatLikeVar[T ~float32 | ~float64](p *T, name, desc string) *option[T] {
+	return ParserVar(p, name, desc, parseFloatLike[T]).withPrefixOK("-")
+}
+
 // Parser creates an option that converts with the provided parse function.
 func Parser[T any](name, desc string, parse func(string) (T, error)) *option[T] {
 	var v T
+	return ParserVar(&v, name, desc, parse)
+}
+
+// Parser creates an option that converts with the provided parse function.
+func ParserVar[T any](p *T, name, desc string, parse func(string) (T, error)) *option[T] {
 	return &option[T]{
 		name:  name,
 		desc:  desc,
-		value: &v,
+		value: p,
 		parse: parse,
 	}
 }
