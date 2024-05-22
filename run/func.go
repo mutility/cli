@@ -121,3 +121,8 @@ func Handler7[
 		return handler(ctx, v1.Value(), v2.Value(), v3.Value(), v4.Value(), v5.Value(), v6.Value(), v7.Value())
 	}
 }
+
+type pass[T any] struct{ param T }
+
+func (v pass[T]) Value() T    { return v.param }
+func Pass[T any](v T) pass[T] { return pass[T]{v} }
